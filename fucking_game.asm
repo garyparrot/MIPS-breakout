@@ -59,6 +59,7 @@
 	syscall
 .end_macro
 
+
 .macro terminate()
 	li $v0, 10
 	syscall
@@ -75,7 +76,8 @@
 	totBlocks:    .word 45
 	Gaming: 	  .word 1 		# is the game running? 
 	frame:		  .word 0		# current frame index, that mean this game can run continusely about 24 days 
-	
+	keyLeftMovement:  .word -6	
+	keyRightMovement: .word  6
 	# Blocks
 	# xpos, ypos, color, destroyed
 	blocks: .word  
@@ -86,7 +88,12 @@
           4, 20,16711935, 0, 20, 20,16711935, 0, 36, 20,16711935, 0, 52, 20,16711935, 0, 68, 20,16711935, 0, 84, 20,16711935, 0,100, 20,16711935, 0,116, 20,16711935, 0,
          12, 25,   65535, 0, 28, 25,   65535, 0, 44, 25,   65535, 0, 60, 25,   65535, 0, 76, 25,   65535, 0, 92, 25,   65535, 0,108, 25,   65535, 0
 	panelX: 	.word 60
-	panelWidth: .word 8
+	panelY:		.word 60
+	panelWidth: .word 12
+	panelMoved: .word 1
+	panelMovement:  .word 0
+	panelColor: .word 0x00ffffff
+
 	
 .text
 	# allocate space
@@ -134,7 +141,37 @@
 
 	# handle input
 	handleInput:
-		jr $ra	
+		lw $t1, 0xffff0000
+		andi $t1, $t1, 0x1
+		beqz $t1, handleInput_exit
+		lw $t0, 0xffff0004
+		sw $zero, 0xffff0004
+		
+		beq $t0, 'a', left_move
+		beq $t0, 'A', left_move
+		beq $t0, 'd', right_move
+		beq $t0, 'D', right_move
+		beq $t0, 'w', shoot_ball
+		j handleInput_exit
+		
+		left_move:
+			lw $t1, keyLeftMovement
+			sw $t1, panelMovement
+			sw $t1, panelMoved
+			j handleInput_exit
+		
+		right_move:
+			lw $t1, keyRightMovement
+			sw $t1, panelMovement
+			sw $t1, panelMoved
+			j handleInput_exit
+		
+		shoot_ball:
+			# TODO: Implement this :(
+			j handleInput_exit
+		
+		handleInput_exit:
+			jr $ra	
 		
 	# allocate space for bitmap
 	allocMemory:
