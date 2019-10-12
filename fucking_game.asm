@@ -59,6 +59,17 @@
 	syscall
 .end_macro
 
+.macro panelRight(%reg)
+	sw $t7, preg+0
+	lw %reg, panelX
+	lw $t7, panelWidth
+	add %reg, %reg, $t7
+	lw $t7, preg+0
+.end_macro
+
+.macro panelLeft(%reg)
+	lw %reg, panelX
+.end_macro
 
 .macro terminate()
 	li $v0, 10
@@ -116,9 +127,12 @@
 		# Handle user key event every 1 frame (equal 10ms)
 		jal handleInput
 		
+		# test if collision happened 1 frame
+		
 		# Let the ball move every 10 frame (equal 100ms)
 		
-		# Redraw the shitty screen 
+		# Drawing shit on the screen
+		jal render
 		
 		# next frame
 		sleep(10)
@@ -136,8 +150,85 @@
 	
 	
 	
-	
-	
+	# render stuff
+	render:
+		testPanel:
+			lw $t0, panelMoved
+			beqz $t0, testBlocks	# test if panel moved
+			sw $zero, panelMoved	# reset flag
+			
+			# test if the movement will go beyond the screen
+			lw $t0, panelX
+			lw $t1, panelMovement
+			add $t0, $t0, $t1
+				slt $t0, $t0, $zero
+				beqz $t0, nothing1	 # if left_pixel < 0, execute following instruction
+				lw $t0, panelX
+				sub $t0, $zero, $t0		
+				sw $t0, panelMovement	# adjust movement in order to avoid panel coordinate underflow 0
+				nothing1:
+			lw $t0, panelX
+			lw $t1, panelMovement
+			lw $t2, panelWidth
+			add $t0, $t0, $t1
+			add $t0, $t0, $t2
+			lw $t1, screen_xsize
+				sge $t0, $t0, $t1
+				beqz $t0, nothing2  # if right_pixel >= xsize, execute following instruction
+				panelRight($t0)
+				sub $t0, $t1, $t0
+				sw $t0, panelMovement	# adjust movement in order to avoid panel coordinate overflow xsize
+				nothing2:
+			
+			panelRight($t3)			# t3 = the right most pixel of panel
+			sll $t3, $t3, 2			# t3 = the right most pixel byte
+			panelLeft($t2)			# t2 = the left most pixel of panel
+			sll $t2, $t2, 2			# t2 = the left most pixel byte
+			lw $t9, screen_xbits
+			lw $t4, panelY
+			
+			sllv $t4, $t4, $t9		# t4 = the position of panel row
+			sll $t4, $t4, 2			# t4 = the byte position of panel row 
+			
+			lw $t0, panelMovement	# t0 = the movement
+			sll $t0, $t0, 2				# t0 = the movement in byte size
+			srl $t1, $t0, 31		# t1 = direction
+			add $t2, $t2, $t4
+			add $t3, $t3, $t4
+			
+			clearPanel:				# clear pixel in [ $t2, $t3 )
+				sw $zero, 0x10040000($t2)
+				addi $t2, $t2, 4
+				bne $t2, $t3, clearPanel
+				
+			panelLeft($t2)
+			sll $t2, $t2, 2
+			add $t2, $t2, $t4
+			add $t2, $t2, $t0
+			add $t3, $t3, $t0
+			lw $t5, panelColor
+			#li $t5, 0x00ff0000
+			drawPanel:				# draw pixel in [ $t2 + movement, $t3 + movement )
+				sw $t5, 0x10040000($t2)
+				addi $t2, $t2, 4
+				bne $t2, $t3, drawPanel
+				
+			# update value
+			lw $t1, panelX
+			lw $t0, panelMovement
+			add $t1, $t1, $t0
+			sw $t1, panelX
+			
+			# done
+			
+		testBlocks:
+			# TOOD: Implement it :(
+			
+		testBall:
+			# TODO: Implement it :(
+			
+		on_exit:
+			jr $ra
 
 	# handle input
 	handleInput:
