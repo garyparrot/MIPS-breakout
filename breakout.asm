@@ -76,6 +76,10 @@
 	syscall
 .end_macro
 
+# }}}
+
+# Data {{{
+
 .data
 	preg: .word 0,0,0,0,0,0,0,0,0
 	jreg: .word 0,0,0,0,0,0,0,0,0
@@ -111,6 +115,7 @@
 	lastms: 	.word 0
 	passedms:   .word 0
 
+# }}}
 	
 .text
 	# allocate space
@@ -188,13 +193,18 @@
 		diff_condition2:
 			subu $v0, $a1, $a0
 			jr $ra
+
+# }}}
 	
+# movingEvent {{{
+
 	movingEvent:
 		moveBall:
 			# move ball based on passed time, current speed
 			# note we better move this ball 1 pixel at a time 
 			# otherwise the ball might cross some object :(
 		jr $ra
+# }}}
 	
 # collisionHandler {{{
 
@@ -297,6 +307,10 @@
 			lw $ra, 0($sp)
 			add $sp, $sp, 4
 			jr $ra
+
+# }}}
+
+# handleInput {{{
 
 	# handle input
 	handleInput:
