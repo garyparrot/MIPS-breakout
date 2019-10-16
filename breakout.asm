@@ -111,6 +111,25 @@
 	panelMovement:  .word 0
 	panelColor: .word 0x00ffffff
 
+	# ball
+	ballX:		.word 63
+	ballY:		.word 55
+	ballWidth:	.word 3
+	ballHeight: .word 3
+	ballMoved:  .word 1
+	ballSpeedX: .word 0             # the value add to XMovement every frame
+	ballSpeedY: .word 0             # the value add to YMovement every frame
+	ballColor:  .word 0x00eeeeee
+    ballXAccMovement: .word 0          # for every 1024 value, this ball moved one x pixel
+    ballYAccMovement: .word 0          # for every 1024 value, this ball moved one y pixel
+	ballXMovement: .word 0
+	ballYMovement: .word 0
+	ballFollowPanel:  	.word  1
+	ballFollowOffsetX: 	.word  5
+	ballFollowOffsetY:  .word -5
+    ballInitialSpeedX:  .word  300
+    ballInitialSpeedY:  .word -150
+	
 	# last frame system time
 	lastms: 	.word 0
 	passedms:   .word 0
@@ -203,7 +222,33 @@
 			# move ball based on passed time, current speed
 			# note we better move this ball 1 pixel at a time 
 			# otherwise the ball might cross some object :(
+			
+            lw $t0, ballSpeedX          # retrieve motion stuff
+            lw $t1, ballSpeedY
+            lw $t2, ballXAccMovement    
+            lw $t3, ballYAccMovement
+            add $t2, $t0, $t2           # calcuate the new accumulated movement of ball
+            add $t3, $t1, $t3
+            sra $t0, $t2, 10            # div it by 1024, now we got the real movement in pixel
+            sra $t1, $t3, 10
+            sw $t0, ballXMovement       # store the movement to ballMovement 
+            sw $t1, ballYMovement
+                bnez $t0, yes_it_is_moving             # if there is some movement, we mark ballMoved on
+                bnez $t1, yes_it_is_moving
+                j c
+                yes_it_is_moving:
+                li $t4, 1
+                sw $t4, ballMoved
+                c:
+            sll $t0, $t0, 10            # mul it by 1024
+            sll $t1, $t1, 10
+            sub $t2, $t2, $t0           # remove these accumulated movement
+            sub $t3, $t3, $t1
+            sw $t2, ballXAccMovement    # store it back
+            sw $t3, ballYAccMovement
+
 		jr $ra
+
 # }}}
 	
 # collisionHandler {{{
@@ -295,6 +340,15 @@
 			add $t1, $t1, $t0
 			sw $t1, panelX
 			
+			# determine if the ball should follow the panel
+				lw $t0, ballFollowPanel
+				beqz $t0, a
+				lw $t0, panelMovement
+				sw $t0, ballXMovement
+				li $t0, 1
+				sw $t0, ballMoved
+				a:
+			
 			# done
 			
 		testBlocks:
@@ -302,6 +356,58 @@
 			
 		testBall:
 			# TODO: Implement it :(
+			lw $t0, ballMoved
+			beqz $t0, on_exit	
+			
+			lw $s0, ballX
+			lw $s1, ballY
+			lw $s2, ballWidth
+			lw $s3, ballHeight
+			
+			# remove the ball from the field
+			add $s4, $s1, $s3
+			clearBalls:
+				beq $s4, $s1, clearBallsEnd
+					
+				add $a0, $s0, $zero	  # begin of x
+				add $a1, $s0, $s2	  # end of x
+				add $a2, $s1, $zero	  # y
+				add $a3, $zero, $zero # clear color
+					
+				jal drawline
+					
+				addi $s1, $s1, 1
+				j clearBalls
+			clearBallsEnd:
+			
+			# change the position of that fucking shit			
+			lw $s0, ballX
+			lw $s1, ballY
+			lw $s2, ballWidth
+			lw $s3, ballHeight
+			lw $t0, ballXMovement
+			lw $t1, ballYMovement
+			add $s0, $s0, $t0
+			add $s1, $s1, $t1
+			sw $s0, ballX
+			sw $s1, ballY
+			sw $zero ballMoved
+			
+			# draw it like it hot
+			add $s4, $s1, $s3
+			drawBalls:
+				beq $s4, $s1, drawBallsEnd
+					
+				add $a0, $s0, $zero	# begin of x
+				add $a1, $s0, $s2	# end of x
+				add $a2, $s1, $zero	# y
+				lw  $a3, ballColor  # color of ball
+					
+				jal drawline
+					
+				addi $s1, $s1, 1
+				j drawBalls
+			drawBallsEnd:
 			
 		on_exit:
 			lw $ra, 0($sp)
@@ -340,7 +446,11 @@
 			j handleInput_exit
 		
 		shoot_ball:
-			# TODO: Implement this :(
+            sw $zero, ballFollowPanel
+            lw $t0, ballInitialSpeedX
+            sw $t0, ballSpeedX
+            lw $t0, ballInitialSpeedY
+            sw $t0, ballSpeedY
 			j handleInput_exit
 		
 		handleInput_exit:
