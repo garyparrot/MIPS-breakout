@@ -105,25 +105,29 @@
 	panelMovement:  .word 0
 	panelColor: .word 0x00ffffff
 
+	# last frame system time
+	lastms: 	.word 0
+	passedms:   .word 0
+
 	
 .text
 	# allocate space
 	jal allocMemory
 	
-	# init Blocks
-	li $s0, 0
-	lw $s1, totBlocks
-	drawBlocksloop:
-		drawBlockR($s0)
-		addi $s0, $s0, 1
-		bne $s0, $s1, drawBlocksloop
-	drawBlocksloopExit:
+	
+	# init system time
+	li $v0, 30			# retrieve system time in ms unit
+	syscall
+	sw $a0, lastms 		# store the lower 32 bit time to lastms
 	
 	# Game loop
 	# For now on, $s7 store the frame number
 	lw $s7, frame
 	GameLoop:
 		
+		# next frame
+		jal waitNextClock		
+						
 		# Handle user key event every 1 frame (equal 10ms)
 		jal handleInput
 		
@@ -144,8 +148,39 @@
 	
 	# exit
 	terminate()
+
+########################################################################################
+########################################################################################
+########################################################################################
 	
 	
+	waitNextClock:
+		sw $a0, jreg+0
+		sw $a1, jreg+4
+		
+		keepWaiting:
+		li $v0, 30
+		syscall					# now current ms been store in $a0
+		lw $a1, lastms 			# load lastms into $a1
+		jal diff 				# call it motherfucker
+		beqz $v0, keepWaiting   # keep waiting until at least 1ms passed
+		
+		sw $v0, passedms		# store the millisecond been passed since last waiting.
+		
+		lw $a0, jreg+0
+		lw $a1, jreg+4
+		jr $ra
+	
+	# given two 32bit value A and B, return the distance between two value
+	diff:
+		slt $v0, $a0, $a1
+		bnez $v0, diff_condition2
+		diff_condition1:
+			subu $v0, $a0, $a1
+			jr $ra
+		diff_condition2:
+			subu $v0, $a1, $a0
+			jr $ra
 	
 	
 	
