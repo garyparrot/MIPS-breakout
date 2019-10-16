@@ -1,3 +1,6 @@
+# vim:set syntax=mips:
+# Macros {{{
+
 .macro allocBitmap(%xsize, %ysize)
 	sw $t7, preg+0
 	sw $a0, preg+4
@@ -106,7 +109,7 @@
     # panel
 	panelX: 	.word 58
 	panelY:		.word 60
-	panelWidth: .word 12
+	panelWidth: .word 13
 	panelMoved: .word 1
 	panelMovement:  .word 0
 	panelColor: .word 0x00ffffff
@@ -352,10 +355,10 @@
 			# done
 			
 		testBlocks:
-			# TOOD: Implement it :(
+			# TODO: Implement block render it :(
 			
 		testBall:
-			# TODO: Implement it :(
+			
 			lw $t0, ballMoved
 			beqz $t0, on_exit	
 			
