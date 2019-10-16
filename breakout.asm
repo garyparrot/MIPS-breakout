@@ -98,7 +98,9 @@
          12, 15,16776960, 0, 28, 15,16776960, 0, 44, 15,16776960, 0, 60, 15,16776960, 0, 76, 15,16776960, 0, 92, 15,16776960, 0,108, 15,16776960, 0,
           4, 20,16711935, 0, 20, 20,16711935, 0, 36, 20,16711935, 0, 52, 20,16711935, 0, 68, 20,16711935, 0, 84, 20,16711935, 0,100, 20,16711935, 0,116, 20,16711935, 0,
          12, 25,   65535, 0, 28, 25,   65535, 0, 44, 25,   65535, 0, 60, 25,   65535, 0, 76, 25,   65535, 0, 92, 25,   65535, 0,108, 25,   65535, 0
-	panelX: 	.word 60
+    
+    # panel
+	panelX: 	.word 58
 	panelY:		.word 60
 	panelWidth: .word 12
 	panelMoved: .word 1
@@ -114,6 +116,14 @@
 	# allocate space
 	jal allocMemory
 	
+	# init Blocks
+	li $s0, 0
+	lw $s1, totBlocks
+	drawBlocksloop:
+		drawBlockR($s0)
+		addi $s0, $s0, 1
+		bne $s0, $s1, drawBlocksloop
+	drawBlocksloopExit:
 	
 	# init system time
 	li $v0, 30			# retrieve system time in ms unit
@@ -128,20 +138,18 @@
 		# next frame
 		jal waitNextClock		
 						
-		# Handle user key event every 1 frame (equal 10ms)
+		# Handle user key event 
 		jal handleInput
 		
-		# test if collision happened 1 frame
+		# Let the ball move 
+		jal movingEvent
 		
-		# Let the ball move every 10 frame (equal 100ms)
+		# test if collision happened 1 frame
+		jal collisionHandler
 		
 		# Drawing shit on the screen
 		jal render
-		
-		# next frame
-		sleep(10)
-		addi $s7, $s7, 1
-		
+
 		# loop
 		lw $t7, Gaming
 		bnez $t7, GameLoop
@@ -149,14 +157,12 @@
 	# exit
 	terminate()
 
-########################################################################################
-########################################################################################
-########################################################################################
-	
-	
+# waitNextClock {{{
+
 	waitNextClock:
 		sw $a0, jreg+0
 		sw $a1, jreg+4
+		sw $ra, jreg+8
 		
 		keepWaiting:
 		li $v0, 30
@@ -169,6 +175,7 @@
 		
 		lw $a0, jreg+0
 		lw $a1, jreg+4
+		lw $ra, jreg+8
 		jr $ra
 	
 	# given two 32bit value A and B, return the distance between two value
@@ -182,11 +189,35 @@
 			subu $v0, $a1, $a0
 			jr $ra
 	
+	movingEvent:
+		moveBall:
+			# move ball based on passed time, current speed
+			# note we better move this ball 1 pixel at a time 
+			# otherwise the ball might cross some object :(
+		jr $ra
 	
+# collisionHandler {{{
+
+	collisionHandler:
 	
+		handleBall:
+		
+			# TODO: handle ball collision with wall
+			# TODO: handle ball collision with panel
+			# TODO: handle ball collision with blocks
+		
+		jr $ra
+
+# }}}
 	
-	# render stuff
+# render {{{
+
 	render:
+		# TODO: Optimize the render process
+		
+		addi $sp, $sp, -4
+		sw $ra, 0($sp)
+	
 		testPanel:
 			lw $t0, panelMoved
 			beqz $t0, testBlocks	# test if panel moved
@@ -263,6 +294,8 @@
 			# TODO: Implement it :(
 			
 		on_exit:
+			lw $ra, 0($sp)
+			add $sp, $sp, 4
 			jr $ra
 
 	# handle input
@@ -346,11 +379,42 @@
 		
 		# exit function
 		jr $ra
+
+# }}}
 		
+# drawline {{{
+
+	# This method draw a line between [$a0, $a1) with color $a3 on y $a2
+	drawline:
+		addi $sp, $sp, -16
+		sw $a0, 0($sp)
+		sw $a1, 4($sp)
+		sw $a2, 8($sp)
 		
+		# transform $a0, $a1, $a2 into byte offset
+		sll $a0, $a0, 2
+		sll $a1, $a1, 2
+		lw  $t0, screen_xbits
+		sllv $a2, $a2, $t0
+		sll $a2, $a2, 2
+		add $a0, $a0, $a2
+		add $a1, $a1, $a2
+		
+		keep_drawing:
+			slt $t0,$a0, $a1			# test if $a0 < $a1
+			beqz $t0 end_of_drawline	
 			
+			sw $a3, 0x10040000($a0)		# paint color on bitmap
+			addi $a0, $a0, 4			# move to next pixel
+			
+			j keep_drawing
+		end_of_drawline:
 		
+		lw $a0, 0($sp)
+		lw $a1, 4($sp)
+		lw $a2, 8($sp)
+		addi $sp, $sp, 16
 		
-		
-		
-		
+		jr $ra
+
+# }}}
