@@ -171,7 +171,7 @@
 		# Let the ball move 
 		jal movingEvent
 		
-		# test if collision happened 1 frame
+		# handle collision
 		jal collisionHandler
 		
 		# Drawing shit on the screen
@@ -259,10 +259,60 @@
 	collisionHandler:
 	
 		handleBall:
+
+            lw $t0, ballX
+            lw $t2, ballXMovement
+            lw $t1, ballY
+            lw $t3, ballYMovement
+            add $s0, $t0, $t2 	# the ball left x position of next frame
+            add $s1, $t1, $t3	# the ball top  y position of next frame
+            lw $t4, ballWidth
+            lw $t5, ballHeight
+            add $s2, $s0, $t4	# the ball right x position of next frame
+            add $s3, $s1, $t5	# the ball bottom y position of next frame
+
+            
+			slti $t0, $s0, 0
+			bnez $t0, on_leftWallCollision		# test if ball collide with left wall
+			
+			lw $t1, screen_xsize
+			sgt $t0, $s2, $t1
+			bnez $t0, on_rightWallCollision		# test if ball collide with right wall
+			
+			slti $t0, $s1, 0
+			bnez $t0, on_topWallCollision		# test if ball collide with top wall
+			
+			lw $t1, screen_ysize
+			sgt $t0, $s3, $t1
+			bnez $t0, on_bottomWallCollision
+			
+			# Nothing happened
+			j on_handleCollisionWithWall_End
+			
+			on_leftWallCollision:
+			on_rightWallCollision:
+				lw $t0, ballSpeedX
+				sub $t0, $zero, $t0		# negative speed-x
+				sw $t0, ballSpeedX
+				j afterCollision
+									
+			on_topWallCollision:
+			on_bottomWallCollision:
+				lw $t0, ballSpeedY
+				sub $t0, $zero, $t0
+				sw $t0, ballSpeedY		# negative speed-y
+				j afterCollision
+				
+			afterCollision:
+				sw $zero, ballXMovement		# remove movement
+				sw $zero, ballYMovement
+			
+			on_handleCollisionWithWall_End:
+
+			# TODO: handle collision between ball and panel
+			# TODO: handle collision between ball and block
 		
-			# TODO: handle ball collision with wall
-			# TODO: handle ball collision with panel
-			# TODO: handle ball collision with blocks
+		onCollisionHandlerExit:
 		
 		jr $ra
 
