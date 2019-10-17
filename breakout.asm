@@ -132,6 +132,16 @@
 	ballFollowOffsetY:  .word -5
     ballInitialSpeedX:  .word  300
     ballInitialSpeedY:  .word -150
+    
+    # collision code
+    collisionCR: .word 3
+    collisionLR: .word 2
+    collisionTB: .word 1
+    
+    # drawline
+    drawline_firstPixelPayload: 	.word 0
+    drawline_lastPixelPayload:   	.word 0
+    drawline_middlePixelPayload:	.word 0
 	
 	# last frame system time
 	lastms: 	.word 0
@@ -354,40 +364,32 @@
 				sw $t0, panelMovement	# adjust movement in order to avoid panel coordinate overflow xsize
 				nothing2:
 			
-			panelRight($t3)			# t3 = the right most pixel of panel
-			sll $t3, $t3, 2			# t3 = the right most pixel byte
-			panelLeft($t2)			# t2 = the left most pixel of panel
-			sll $t2, $t2, 2			# t2 = the left most pixel byte
-			lw $t9, screen_xbits
-			lw $t4, panelY
+			# remove panel frome the field
+			sw $zero, drawline_firstPixelPayload
+			sw $zero, drawline_middlePixelPayload
+			sw $zero, drawline_lastPixelPayload
+			lw $a0, panelX			# begin of drawing
+			lw $a1, panelWidth
+			add $a1, $a1, $a0		# end of drawing
+			lw $a2, panelY			# yoffset
+			li $a3, 0				# no color
+			jal drawline
 			
-			sllv $t4, $t4, $t9		# t4 = the position of panel row
-			sll $t4, $t4, 2			# t4 = the byte position of panel row 
+			# draw it with movement
+			lw $t0, collisionLR
+			lw $t1, collisionTB
+			sw $t0, drawline_firstPixelPayload
+			sw $t0, drawline_lastPixelPayload
+			sw $t1, drawline_middlePixelPayload
 			
-			lw $t0, panelMovement	# t0 = the movement
-			sll $t0, $t0, 2				# t0 = the movement in byte size
-			srl $t1, $t0, 31		# t1 = direction
-			add $t2, $t2, $t4
-			add $t3, $t3, $t4
-			
-			clearPanel:				# clear pixel in [ $t2, $t3 )
-				sw $zero, 0x10040000($t2)
-				addi $t2, $t2, 4
-				bne $t2, $t3, clearPanel
+			lw $t0, panelMovement
+			add $a0, $a0, $t0		# begin of drawing
+			add $a1, $a1, $t0		# end of drawing
+			lw $a2, panelY
+			lw $a3, panelColor
+			jal drawline
 				
-			panelLeft($t2)
-			sll $t2, $t2, 2
-			add $t2, $t2, $t4
-			add $t2, $t2, $t0
-			add $t3, $t3, $t0
-			lw $t5, panelColor
-			#li $t5, 0x00ff0000
-			drawPanel:				# draw pixel in [ $t2 + movement, $t3 + movement )
-				sw $t5, 0x10040000($t2)
-				addi $t2, $t2, 4
-				bne $t2, $t3, drawPanel
-				
-			# update value
+			# update panel
 			lw $t1, panelX
 			lw $t0, panelMovement
 			add $t1, $t1, $t0
@@ -419,9 +421,15 @@
 			
 			# remove the ball from the field
 			add $s4, $s1, $s3
+					
+			# no payload require for ball		
+			sw $zero, drawline_firstPixelPayload
+			sw $zero, drawline_lastPixelPayload
+			sw $zero, drawline_middlePixelPayload
+			
 			clearBalls:
 				beq $s4, $s1, clearBallsEnd
-					
+				
 				add $a0, $s0, $zero	  # begin of x
 				add $a1, $s0, $s2	  # end of x
 				add $a2, $s1, $zero	  # y
@@ -568,6 +576,15 @@
 		sw $a1, 4($sp)
 		sw $a2, 8($sp)
 		
+		# loading extra argument from global :p
+		# this is a hack, Don't do it at home
+		lw $t5, drawline_firstPixelPayload
+		lw $t6, drawline_middlePixelPayload
+		lw $t7, drawline_lastPixelPayload
+		sll $t5, $t5, 24
+		sll $t6, $t6, 24
+		sll $t7, $t7, 24
+		
 		# transform $a0, $a1, $a2 into byte offset
 		sll $a0, $a0, 2
 		sll $a1, $a1, 2
@@ -577,15 +594,26 @@
 		add $a0, $a0, $a2
 		add $a1, $a1, $a2
 		
+		# This code is a serious joke, just like the assignment itself :p
+		or $t1, $a3, $t5				# compose payload with color code
+		sw $t1, 0x10040000($a0)			# store first payload
+		addi $a0, $a0, 4
+		
+		or $t1, $a3, $t6				# compose payload with color code
+		addi $a1, $a1, -4				# minus target by one pixel
+		
 		keep_drawing:
 			slt $t0,$a0, $a1			# test if $a0 < $a1
 			beqz $t0 end_of_drawline	
 			
-			sw $a3, 0x10040000($a0)		# paint color on bitmap
+			sw $t1, 0x10040000($a0)		# paint color on bitmap
 			addi $a0, $a0, 4			# move to next pixel
 			
 			j keep_drawing
 		end_of_drawline:
+		
+		or $t1, $a3, $t7				# compose payload with color code
+		sw $t1, 0x10040000($a0)			# store it back
 		
 		lw $a0, 0($sp)
 		lw $a1, 4($sp)
