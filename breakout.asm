@@ -134,7 +134,10 @@
 	block_width:  .word 8
 	block_height: .word 5
 	totBlocks:    .word 45
-	Gaming: 	  .word 1 		# is the game running? 
+	gaming: 	  .word 1 		# is the game running? 
+	uWin:		  .word 0
+	uLose: 		  .word 0
+	gameCheating: .word 0		# cheating mode
 	frame:		  .word 0		# current frame index, that mean this game can run continusely about 24 days 
 	keyLeftMovement:  .word -6	
 	keyRightMovement: .word  6
@@ -178,6 +181,7 @@
 	ballFollowOffsetY:  .word -5
     ballInitialSpeedX:  .word  300
     ballInitialSpeedY:  .word -150
+    ballTouchBottomWall: .word 0
     
     # collision code
     collisionCR: .word 3
@@ -193,6 +197,35 @@
 	# last frame system time
 	lastms: 	.word 0
 	passedms:   .word 0
+	
+	win_bitmap: .word 
+            56, 30, 0x422400, 56, 31, 0x643a00, 56, 32, 0x4f2f00, 57, 28, 0x784700, 57, 29, 0x070502, 57, 30, 0x302617, 57, 31, 0x452f03, 57, 32, 0xdbac1a, 57, 33, 0xe1a312, 57, 34, 0x935a01, 
+            58, 27, 0x895401, 58, 28, 0xf3c521, 58, 29, 0x2f2e28, 58, 30, 0x2c2c2b, 58, 32, 0x695b12, 58, 33, 0xfbce29, 58, 34, 0xf6ac1b, 58, 35, 0xab6903, 59, 26, 0x372000, 59, 27, 0xecb518, 
+            59, 28, 0xfbdf2f, 59, 29, 0x070701, 59, 32, 0x5b4f10, 59, 33, 0xfbce29, 59, 34, 0xf7af21, 59, 35, 0xf29d15, 59, 36, 0x6c3e00, 60, 26, 0x945c01, 60, 27, 0xfddc2c, 60, 28, 0xfee230, 
+            60, 29, 0x0d0b02, 60, 32, 0x94811b, 60, 33, 0x665622, 60, 34, 0xf6ae21, 60, 35, 0xf6a41e, 60, 36, 0xb97404, 61, 26, 0xba8007, 61, 27, 0xfee230, 61, 28, 0xfee230, 61, 29, 0x211d06, 
+            61, 30, 0x312b09, 61, 31, 0x8a7a1a, 61, 32, 0xfbdc2e, 61, 33, 0x3e3921, 61, 34, 0xc2891f, 61, 35, 0xf6a41e, 61, 36, 0xd7890b, 62, 26, 0xbf8709, 62, 27, 0xfee230, 62, 28, 0xfee230, 
+            62, 29, 0x262207, 62, 30, 0x9a891d, 62, 31, 0xefd52d, 62, 32, 0xfede2e, 62, 33, 0x464021, 62, 34, 0xb07c1f, 62, 35, 0xf6a41e, 62, 36, 0xdb8b0c, 63, 26, 0xab7003, 63, 27, 0xfee130, 
+            63, 28, 0xfee230, 63, 29, 0x1e1c0c, 63, 30, 0x292929, 63, 31, 0x131103, 63, 32, 0xd3b926, 63, 33, 0x363220, 63, 34, 0xe3a120, 63, 35, 0xf6a41e, 63, 36, 0xca7f08, 64, 26, 0x6a3f00, 
+            64, 27, 0xf9cc23, 64, 28, 0xfce02f, 64, 29, 0x292822, 64, 30, 0x191919, 64, 32, 0x695b13, 64, 33, 0xcea927, 64, 34, 0xf7b021, 64, 35, 0xf5a21b, 64, 36, 0x985c01, 65, 27, 0xc38708, 
+            65, 28, 0xfadb2d, 65, 29, 0x070701, 65, 32, 0x584d0f, 65, 33, 0xfbce29, 65, 34, 0xf7af21, 65, 35, 0xda8a09, 65, 36, 0x221000, 66, 27, 0x2e1900, 66, 28, 0xc88b0a, 66, 29, 0x080601, 
+            66, 32, 0xa18d1d, 66, 33, 0xfac724, 66, 34, 0xda900c, 66, 35, 0x523200, 67, 30, 0x352000, 67, 31, 0x855803, 67, 32, 0xba7f07, 67, 33, 0x8a5400, 67, 34, 0x1c0f00, 0,0,0
+    lose_bitmap: .word
+            56, 37, 0x250e07, 56, 38, 0x090202, 57, 35, 0x100202, 57, 36, 0x6a3927, 57, 37, 0x824a35, 57, 38, 0x6e3b2a, 57, 39, 0x040400, 58, 33, 0x2f140c, 58, 34, 0x653928, 58, 35, 0x603222, 
+            58, 36, 0x8c5540, 58, 37, 0x8c533e, 58, 38, 0x834b37, 58, 39, 0x32150e, 59, 31, 0x270d06, 59, 32, 0x3b1a10, 59, 33, 0x764534, 59, 34, 0x9f6a58, 59, 35, 0x98624f, 59, 36, 0x925b46, 
+            59, 37, 0x8c533e, 59, 38, 0x88503b, 59, 39, 0x482216, 60, 30, 0x31150c, 60, 31, 0x8e5b49, 60, 32, 0xb38c7f, 60, 33, 0xd8c5be, 60, 34, 0xb99284, 60, 35, 0xb79284, 60, 36, 0x5d4035, 
+            60, 37, 0x88513c, 60, 38, 0x8b523d, 60, 39, 0x52291b, 61, 27, 0x180703, 61, 28, 0x2c130a, 61, 29, 0x845343, 61, 30, 0x875543, 61, 31, 0xb28171, 61, 32, 0xe0d6d3, 61, 33, 0x3a3a3a, 
+            61, 34, 0xd8d1ce, 61, 35, 0xbd998c, 61, 36, 0x696969, 61, 37, 0x2e1b14, 61, 38, 0x8b523d, 61, 39, 0x582d1e, 62, 27, 0x5b2f20, 62, 28, 0x9d6c5c, 62, 29, 0xbf9183, 62, 30, 0xba8b7c, 
+            62, 31, 0xb38373, 62, 32, 0xd8c2ba, 62, 33, 0xbbbbbb, 62, 34, 0xd5c0b9, 62, 35, 0xb48c7e, 62, 36, 0xa3a3a3, 62, 38, 0x764533, 62, 39, 0x5b2e1f, 63, 27, 0x37180f, 63, 28, 0xac7b6c, 
+            63, 29, 0xc09384, 63, 30, 0xba8b7b, 63, 31, 0xb38373, 63, 32, 0xad7c6a, 63, 33, 0xb4897a, 63, 34, 0xa06c59, 63, 35, 0xb18879, 63, 36, 0xb6b6b6, 63, 38, 0x633a2b, 63, 39, 0x5c3020, 
+            64, 28, 0x673b2b, 64, 29, 0xb68879, 64, 30, 0xb9897a, 64, 31, 0xb38373, 64, 32, 0xdac4bd, 64, 33, 0xb6b5b5, 64, 34, 0xd7c3bc, 64, 35, 0xb48c7e, 64, 36, 0xa2a2a2, 64, 38, 0x754533, 
+            64, 39, 0x5a2e1e, 65, 28, 0x0d0202, 65, 29, 0x4f281b, 65, 30, 0x693a2a, 65, 31, 0xb07f6f, 65, 32, 0xe0d6d2, 65, 33, 0x404040, 65, 34, 0xd8d1ce, 65, 35, 0xbd9a8d, 65, 36, 0x676767, 
+            65, 37, 0x2c1a13, 65, 38, 0x8b523d, 65, 39, 0x552b1d, 66, 30, 0x270f09, 66, 31, 0x895643, 66, 32, 0xad8476, 66, 33, 0xd4bfb8, 66, 34, 0xb68e80, 66, 35, 0xb68f81, 66, 36, 0x5e4034, 
+            66, 37, 0x88513c, 66, 38, 0x8a513c, 66, 39, 0x4e2718, 67, 31, 0x1c0a06, 67, 32, 0x32160b, 67, 33, 0x6e3f2e, 67, 34, 0x9e6957, 67, 35, 0x96604c, 67, 36, 0x915b46, 67, 37, 0x8c533e, 
+            67, 38, 0x884f3a, 67, 39, 0x442215, 68, 33, 0x230d06, 68, 34, 0x572d1e, 68, 35, 0x562a1c, 68, 36, 0x8a533f, 68, 37, 0x8c533e, 68, 38, 0x844b37, 68, 39, 0x32150e, 69, 35, 0x0b0303, 
+            69, 36, 0x683726, 69, 37, 0x824935, 69, 38, 0x6e3a29, 69, 39, 0x0b0303, 70, 37, 0x1f0d05, 70, 38, 0x040400, 0,0,0
+
+
+
 
 # }}}
 	
@@ -231,15 +264,44 @@
 		# handle collision
 		jal collisionHandler
 		
+		# Test if game finished
+		jal gameCheck
+		
 		# Drawing shit on the screen
 		jal render
-
+		
 		# loop
-		lw $t7, Gaming
+		lw $t7, gaming
 		bnez $t7, GameLoop
 	
 	# exit
 	terminate()
+	
+# gameCheck {{{
+
+	gameCheck:
+	
+		# test if all blocks been destroyed
+		winTest:
+			lw $t0, blockRemaining
+			bnez $t0, loseTest
+				li $t0, 1
+				sw $t0, uWin
+				sw $zero, gaming
+		
+		# test if the ball touched the ground
+		loseTest:
+			lw $t0, gameCheating
+			lw $t1, ballTouchBottomWall
+			bnez $t0, gameCheck_Exit	
+			beqz $t1, gameCheck_Exit
+				sw $zero, gaming
+				sw $t1, uLose
+		
+		gameCheck_Exit:
+		jr $ra
+
+# }}}
 
 # waitNextClock {{{
 
@@ -357,9 +419,12 @@
 				sub $t0, $zero, $t0		# negative speed-x
 				sw $t0, ballSpeedX
 				j afterCollision
+								
 									
+			on_bottomWallCollision:	
+				li $t0, 1
+				sw $t0, ballTouchBottomWall
 			on_topWallCollision:
-			on_bottomWallCollision:
 				lw $t0, ballSpeedY
 				sub $t0, $zero, $t0
 				sw $t0, ballSpeedY		# negative speed-y
@@ -618,7 +683,7 @@
 		testBall:
 			
 			lw $t0, ballMoved
-			beqz $t0, on_exit	
+			beqz $t0, testBall_end	
 			
 			lw $s0, ballX
 			lw $s1, ballY
@@ -675,11 +740,68 @@
 				addi $s1, $s1, 1
 				j drawBalls
 			drawBallsEnd:
+		testBall_end:
+			
+		testWin:
+			lw $t0, uWin
+			beqz $t0, testWin_end
+			la $a0, win_bitmap
+			jal drawPixelArt
+		testWin_end:
+			
+			
+		testLose:	
+			lw $t0, uLose
+			beqz $t0, testLose_end
+			la $a0, lose_bitmap
+			jal drawPixelArt
+		testLose_end: 
+			
 			
 		on_exit:
 			lw $ra, 0($sp)
 			add $sp, $sp, 4
 			jr $ra
+	
+	# draw Pixel art
+	# $a0, the beginning of pixel art array address, each entry are 3 word long, represent [x,y,color]. The array is null-terminated, means [0,0,0]		
+	drawPixelArt:
+		add $sp, $sp, -4
+		sw $a0, 0($sp)
+		
+		keep_drawing_pixelart:
+			lw $t0, 0($a0)
+			lw $t1, 4($a0)
+			lw $t2, 8($a0)
+			
+			# test if terminated
+			li $t4, 0
+			sne $t5, $t0, $zero
+			add $t4, $t4, $t5
+			sne $t5, $t1, $zero
+			add $t4, $t4, $t5
+			sne $t5, $t2, $zero
+			add $t4, $t4, $t5
+			beqz $t4, stop_drawing_pixelart 
+			
+			# calcuate byte offset of that pixel
+			lw $t3, screen_xbits
+			sll $t0, $t0, 2
+			sll $t1, $t1, 2
+			sllv $t1, $t1, $t3
+			add $t0, $t0, $t1
+			
+			# store the color
+			sw $t2, 0x10040000($t0)
+			
+			addi $a0, $a0, 12
+			j keep_drawing_pixelart
+		stop_drawing_pixelart:
+		
+		lw $a0, 0($sp)
+		add $sp, $sp, 4
+		jr $ra
+	
 
 # }}}
 
