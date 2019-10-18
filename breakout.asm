@@ -113,6 +113,7 @@
 	panelMoved: .word 1
 	panelMovement:  .word 0
 	panelColor: .word 0x00ffffff
+	panelObjectId: .word 63
 
 	# ball
 	ballX:		.word 63
@@ -122,7 +123,7 @@
 	ballMoved:  .word 1
 	ballSpeedX: .word 0             # the value add to XMovement every frame
 	ballSpeedY: .word 0             # the value add to YMovement every frame
-	ballColor:  .word 0x00eeeeee
+	ballColor:  .word 0x00eeeeee	# warning: ball color must be unique to other color on the screen
     ballXAccMovement: .word 0          # for every 1024 value, this ball moved one x pixel
     ballYAccMovement: .word 0          # for every 1024 value, this ball moved one y pixel
 	ballXMovement: .word 0
@@ -267,6 +268,11 @@
 # collisionHandler {{{
 
 	collisionHandler:
+
+        addi $sp, $sp, -12
+        sw $s0, 0($sp)
+        sw $s1, 4($sp)
+        sw $ra, 8($sp)
 	
 		handleBall:
 
@@ -319,13 +325,126 @@
 			
 			on_handleCollisionWithWall_End:
 
-			# TODO: handle collision between ball and panel
 			# TODO: handle collision between ball and block
-		
+
+            # Test if any color code intersection. if so, read the color payload 
+            # trigger different operation up on color code
+            # modify ball movement and speed up on operation
+            lw $t0, ballX
+            lw $t1, ballY 
+            lw $t2, ballXMovement
+            lw $t3, ballYMovement
+            
+            or $t4, $t2, $t3
+            beqz $t4, onCollisionHandlerExit	# if there is no movement, we don't have to check collision
+            
+            add $s0, $t0, $t2           # $s0 = pixel of new ballX
+            add $s1, $t1, $t3           # $s1 = pixel of new ballY
+            lw $s2, ballWidth           # $s2 = remaining width
+            lw $s3, ballHeight          # $s3 = remaining height
+            
+            loop_rows:
+                beqz $s3, loop_rows_end         # no more height for scanning
+	            lw $t8, screen_xbits
+                sllv $t2, $s1, $t8
+                sll  $t2, $t2, 2                # $t2 = offset y
+                sll  $t3, $s0, 2                # $t3 = offset x
+                add  $s4, $t2, $t3              # $s4 = $t2 + $t3, scan offset for next row
+                    keep_scanning666:
+                        lw $t4, 0x10040000($s4) # $t4 = specific pixel
+						lw $t7, ballColor		# $t7 = color of ball
+                        beq $t4, $t7, continue_scanning666		# if this is the ball itself, scan next pixel
+                        beqz $t4, continue_scanning666			# if there is nothing, scan next pixel 
+                        
+                        srl $t4, $t4, 24        # $t4 = payload of specific pixel
+						andi $a0, $t4, 0x3f		# object id
+						andi $a1, $t4, 0xc0		
+						srl  $a1, $a1, 6		# collision direction
+						jal collision_event
+						
+						# print collision object id
+						li $v0, 1
+						syscall
+						li $a0, ' '
+						li $v0, 11
+						syscall
+						add $a0, $a1, $zero
+						li $v0, 1
+						syscall
+						li $a0, '\n'
+						li $v0, 11
+						syscall
+						
+						continue_scanning666:
+                        subi $s2, $s2, 1
+                        addi $s4, $s4, 4
+                        bnez $s2, keep_scanning666
+
+                lw $s2, ballWidth                # reload width
+                subi $s3, $s3, 1                # minus one height
+                addi $s1, $s1, 1                # yoffset plus one
+                j loop_rows
+             loop_rows_end:
+
 		onCollisionHandlerExit:
+
+        lw $s0, 0($sp)
+        lw $s1, 4($sp)
+        lw $ra, 8($sp)
+        addi $sp, $sp, 12
 		
 		jr $ra
-
+		
+	# Once collision happened, this subroutin get called
+	# $a0: the if of object who collide with ball
+	# $a1: the direction code 
+	collision_event:
+		
+		add $sp, $sp, -4
+		sw $ra, 0($sp)
+		
+		# test panel collision
+		next_collision_0:
+			lw $t0, panelObjectId
+			bne $t0, $a0, next_collision_1
+			
+			jal collision_change_ball_movement
+		
+		next_collision_1:
+		
+		lw $ra, 0($sp)
+		add $sp, $sp, 4
+		
+		jr $ra
+		
+	# Change ball movement based on collision direction code
+	# $a1: the direction code
+	collision_change_ball_movement:
+		lw $t0, collisionLR
+		lw $t1, collisionTB
+		lw $t2, collisionCR
+		beq $t0, $a1, collisionLR_movement
+		beq $t1, $a1, collisionTB_movement
+		beq $t2, $a1, collisionCR_movement
+		jr $ra
+		collisionCR_movement:
+			# TODO: Implement CR movement		
+		
+		collisionLR_movement:
+			sw $zero, ballXMovement
+			sw $zero, ballYMovement
+			lw $t0, ballSpeedX
+			sub $t0, $zero, $t0
+			sw $t0, ballSpeedX
+			jr $ra
+		collisionTB_movement:
+			sw $zero, ballXMovement
+			sw $zero, ballYMovement
+			lw $t0, ballSpeedY
+			sub $t0, $zero, $t0
+			sw $t0, ballSpeedY
+			jr $ra
+		
 # }}}
 	
 # render {{{
@@ -378,6 +497,11 @@
 			# draw it with movement
 			lw $t0, collisionLR
 			lw $t1, collisionTB
+			sll $t0, $t0, 6
+			sll $t1, $t1, 6
+			lw $t2, panelObjectId
+			or $t0, $t0, $t2
+			or $t1, $t1, $t2
 			sw $t0, drawline_firstPixelPayload
 			sw $t0, drawline_lastPixelPayload
 			sw $t1, drawline_middlePixelPayload
