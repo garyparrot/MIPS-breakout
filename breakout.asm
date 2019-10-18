@@ -18,6 +18,32 @@
 	lw $v0, preg+8
 .end_macro
 
+.macro setFirstPixelPayload(%id, %direction)
+	sw $t7, preg+0
+	lw $t7, %direction
+	sll $t7, $t7, 6
+	or $t7, $t7, %id
+	sw $t7, drawline_firstPixelPayload
+	lw $t7, preg+0
+.end_macro
+.macro setMiddlePixelPayload(%id, %direction)
+	sw $t7, preg+0
+	lw $t7, %direction
+	sll $t7, $t7, 6
+	or $t7, $t7, %id
+	sw $t7, drawline_middlePixelPayload
+	lw $t7, preg+0
+.end_macro
+.macro setLastPixelPayload(%id, %direction)
+	sw $t7, preg+0
+	lw $t7, %direction
+	sll $t7, $t7, 6
+	or $t7, $t7, %id
+	sw $t7, drawline_lastPixelPayload
+	lw $t7, preg+0
+.end_macro
+
+
 .macro getXpos(%block_id,%save_target)
 	sw %block_id, preg+0
 	sll %block_id, %block_id, 4
@@ -46,13 +72,29 @@
 	lw %block_id, preg+0
 .end_macro
 
+.macro setStatusDestoryed(%block_id)
+	sw %block_id, preg+0
+	sw $t7, preg+4
+	sw $t8, preg+8
+	sll %block_id, %block_id, 4
+	lw $t7, blocks+12(%block_id)
+	lw $t8, blockStatusDestroyed
+	or $t7, $t7, $t8
+	sw $t7, blocks+12(%block_id)
+	lw $t7, preg+4
+	lw $t8, preg+8
+	lw %block_id, preg+0
+.end_macro
+
 .macro drawBlockR(%block_id)
 	addi $a0, %block_id, 0
+	li $a1, 0
 	jal drawBlock
 .end_macro
 
 .macro drawBlockI(%block_id)
 	li $a0, %block_id
+	li $a1, 0
 	jal drawBlock
 .end_macro
 
@@ -105,6 +147,9 @@
          12, 15,16776960, 0, 28, 15,16776960, 0, 44, 15,16776960, 0, 60, 15,16776960, 0, 76, 15,16776960, 0, 92, 15,16776960, 0,108, 15,16776960, 0,
           4, 20,16711935, 0, 20, 20,16711935, 0, 36, 20,16711935, 0, 52, 20,16711935, 0, 68, 20,16711935, 0, 84, 20,16711935, 0,100, 20,16711935, 0,116, 20,16711935, 0,
          12, 25,   65535, 0, 28, 25,   65535, 0, 44, 25,   65535, 0, 60, 25,   65535, 0, 76, 25,   65535, 0, 92, 25,   65535, 0,108, 25,   65535, 0
+    blockStatusDestroyed: .word 0x1
+    blockStatusBonus: 	  .word 0x2
+    blockRemaining:		  .word 45
     
     # panel
 	panelX: 	.word 58
@@ -138,6 +183,7 @@
     collisionCR: .word 3
     collisionLR: .word 2
     collisionTB: .word 1
+    collisionNP: .word 0
     
     # drawline
     drawline_firstPixelPayload: 	.word 0
@@ -325,8 +371,6 @@
 			
 			on_handleCollisionWithWall_End:
 
-			# TODO: handle collision between ball and block
-
             # Test if any color code intersection. if so, read the color payload 
             # trigger different operation up on color code
             # modify ball movement and speed up on operation
@@ -396,7 +440,7 @@
 		jr $ra
 		
 	# Once collision happened, this subroutin get called
-	# $a0: the if of object who collide with ball
+	# $a0: the id of object who collide with ball
 	# $a1: the direction code 
 	collision_event:
 		
@@ -410,7 +454,17 @@
 			
 			jal collision_change_ball_movement
 		
+		# test block collision
 		next_collision_1:
+			lw $t0, totBlocks
+			slt $t1, $a0, $t0
+			beqz $t1, next_collision_2
+			
+			setStatusDestoryed($a0)
+			
+			jal collision_change_ball_movement
+			
+		next_collision_2:
 		
 		lw $ra, 0($sp)
 		add $sp, $sp, 4
@@ -532,6 +586,34 @@
 			
 		testBlocks:
 			# TODO: Implement block render it :(
+			li $s0, 0
+			lw $s1, totBlocks
+				loop_blockDestoryed_check:
+				
+				beq $s0, $s1, loop_blockDestoryed_check_end
+				getStatus($s0, $t0)				# retrieve the state of specific block
+				lw $t1, blockStatusDestroyed
+				and $t0, $t0, $t1
+					beqz $t0, continue_aaa	# test if the block has been destoryed
+					
+					# if so, remove block from bitmap
+					add $a0, $s0, $zero
+					li $a1, 1
+					jal drawBlock
+					
+					lw $t0, blockRemaining		# minus remaining block counter by one
+					sub $t0, $t0, 1
+					sw $t0, blockRemaining
+					
+					sll $t0, $s0, 4
+					sw $zero, blocks+12($t0)	# clear status
+					
+					continue_aaa:				# end of if
+				addi $s0, $s0, 1
+				j loop_blockDestoryed_check
+				
+				loop_blockDestoryed_check_end:
+			
 			
 		testBall:
 			
@@ -647,44 +729,96 @@
 		jr $ra
 		
 	# Function for drawing block
+	# $a0, the block id
+	# $a1, indicate that wipe out this block from bitmap
 	drawBlock:
-		getXpos($a0,  $t0)
-		getYpos($a0,  $t1)
-		getColor($a0, $t2)
-		sll $t3, $t0, 2 		# xscan in byte position
-		lw  $t5, screen_xbits 	# get the bit size of screen width (for 512 width, it will be 9 bits)
-		sllv $t4, $t1, $t5		# yoffset in position
-		sll  $t4, $t4, 2		# yoffset in byte position
+		addi $sp, $sp, -48
+		sw $a0, 0($sp)
+		sw $a1, 4($sp)
+		sw $a2, 8($sp)
+		sw $a3, 12($sp)
+		sw $ra, 16($sp)
+		sw $s0, 20($sp)
+		sw $s1, 24($sp)
+		sw $s2, 28($sp)
+		sw $s3, 32($sp)
+		sw $s4, 36($sp)
+		sw $s7, 40($sp)
+		sw $s6, 44($sp)
+		add $s7, $a0, $zero 		# $s7 = the id of block
+		add $s6, $a1, $zero			# $s6 = indicate balabala
 		
-		lw  $t1, screen_xsize
-		sll $t1, $t1, 2			# byte size of a row
+		getXpos ($a0, $s0)			# $s0 = x pos 
+		getYpos ($a0, $s1)			# $s1 = y pos
+		getColor($a0, $s2)			# $s2 = color
+		lw $s3, block_width			# $s3 = width
+		lw $s4, block_height		# $s4 = height
 		
-		lw $t5, block_width
-		sll $t5, $t5, 2			# the byte size of block width
-		add $t5, $t5, $t3		# get the scan destination for x
 		
-		lw $t6, block_height
+		beqz $s6, end_if_0000
+			li $s2, 0				# no color
+			setFirstPixelPayload ($zero, collisionNP)
+			setMiddlePixelPayload($zero, collisionNP)
+			setLastPixelPayload  ($zero, collisionNP)
+		end_if_0000:
 		
-		# t0 = xpos
-		# t1 = byte size of a row in screen
-		# t2 = the color
-		# t3 = xscan
-		# t4 = yoffset
-		# t5 = xscan-destination
-		# t6 = remaining line
-		nop
-		draw_line:
-			beq $t3, $t5, next_line		# if the line is finished, jump
-			add $t7, $t3, $t4			# the byte position of target pixel
-			sw $t2, 0x10040000($t7)		# draw pixel
-			add $t3, $t3, 4				# move to next pixel
-			j draw_line
-			next_line:
-			sll $t3, $t0, 2				# reset the xscan byte position to left-most pixel
-			add $t4, $t4, $t1			# move yoffset to next line
-			subi $t6, $t6, 1			# minus remaining line by 1
-			bnez $t6, draw_line
-		draw_line_finished:
+		# raindrop, draw top
+		add $a0, $s0, $zero
+		add $a1, $s0, $s3
+		add $a2, $s1, $zero
+		add $a3, $s2, $zero
+		bnez $s6, end_if_0001
+			setFirstPixelPayload ($s7, collisionCR)
+			setMiddlePixelPayload($s7, collisionTB)
+			setLastPixelPayload  ($s7, collisionCR)
+		end_if_0001:
+		jal drawline
+		
+		# move to next line
+		sub $s4, $s4, 2
+		add $s1, $s1, 1
+		
+		# draw middle
+		loop_drawblock:
+			add $a0, $s0, $zero
+			add $a1, $s0, $s3
+			add $a2, $s1, $zero
+			add $a3, $s2, $zero
+			bnez $s6, end_if_0002
+				setFirstPixelPayload ($s7, collisionLR)
+				setMiddlePixelPayload($s7, collisionNP)
+				setLastPixelPayload  ($s7, collisionLR)
+			end_if_0002:
+			jal drawline
+			addi $s1, $s1, 1
+			subi $s4, $s4, 1
+			bnez $s4, loop_drawblock
+		
+		# raindrop, draw bottom
+		add $a0, $s0, $zero
+		add $a1, $s0, $s3
+		add $a2, $s1, $zero
+		add $a3, $s2, $zero
+		bnez $s6, end_if_0003
+			setFirstPixelPayload ($s7, collisionCR)
+			setMiddlePixelPayload($s7, collisionTB)
+			setLastPixelPayload  ($s7, collisionCR)
+		end_if_0003:
+		jal drawline
+
+		lw $a0, 0($sp)
+		lw $a1, 4($sp)
+		lw $a2, 8($sp)
+		lw $a3, 12($sp)
+		lw $ra, 16($sp)
+		lw $s0, 20($sp)
+		lw $s1, 24($sp)
+		lw $s2, 28($sp)
+		lw $s3, 32($sp)
+		lw $s4, 36($sp)
+		lw $s7, 40($sp)
+		lw $s6, 44($sp)
+		addi $sp, $sp, 48
 		
 		# exit function
 		jr $ra
