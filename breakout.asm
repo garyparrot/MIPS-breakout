@@ -212,7 +212,7 @@
 	gaming: 	  .word 1 		# is the game running? 
 	uWin:		  .word 0
 	uLose: 		  .word 0
-	gameCheating: .word 0		# cheating mode
+	gameCheating: .word 1		# cheating mode
 	frame:		  .word 0		# current frame index, that mean this game can run continusely about 24 days 
 	keyLeftMovement:  .word -6	
 	keyRightMovement: .word  6
@@ -225,6 +225,10 @@
          12, 15,16776960, 0, 28, 15,16776960, 0, 44, 15,16776960, 0, 60, 15,16776960, 0, 76, 15,16776960, 0, 92, 15,16776960, 0,108, 15,16776960, 0,
           4, 20,16711935, 0, 20, 20,16711935, 0, 36, 20,16711935, 0, 52, 20,16711935, 0, 68, 20,16711935, 0, 84, 20,16711935, 0,100, 20,16711935, 0,116, 20,16711935, 0,
          12, 25,   65535, 0, 28, 25,   65535, 0, 44, 25,   65535, 0, 60, 25,   65535, 0, 76, 25,   65535, 0, 92, 25,   65535, 0,108, 25,   65535, 0
+    blockCollided: .word 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+					     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+					     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+					     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     blockStatusDestroyed: .word 0x1
     blockStatusBonus: 	  .word 0x2
     blockRemaining:		  .word 45
@@ -263,6 +267,7 @@
     collisionLR: .word 2
     collisionTB: .word 1
     collisionNP: .word 0
+    collisionPushByPanel: .word 4
     
     # drawline
     drawline_firstPixelPayload: 	.word 0
@@ -317,11 +322,13 @@
 		bne $s0, $s1, drawBlocksloop
 	drawBlocksloopExit:
 	
+	# TODO: Clean screen on start up
+	
 	# init system time
 	li $v0, 30			# retrieve system time in ms unit
 	syscall
 	sw $a0, lastms 		# store the lower 32 bit time to lastms
-	
+			
 	# Game loop
 	# For now on, $s7 store the frame number
 	lw $s7, frame
@@ -355,6 +362,8 @@
 # gameCheck {{{
 
 	gameCheck:
+	
+		# TODO: speed up ball speed base on remaining blocks
 	
 		# test if all blocks been destroyed
 		winTest:
@@ -523,6 +532,15 @@
             lw $s2, ballWidth           # $s2 = remaining width
             lw $s3, ballHeight          # $s3 = remaining height
             
+            # clear collided tag
+            li $t0, 64
+            li $t1, 0
+            keep_do_it_LOL:
+            	sw $zero, blockCollided($t1)
+            	addi $t1, $t1, 4
+            	subi $t0, $t0, 1
+            	bnez $t0, keep_do_it_LOL
+            
             loop_rows:
                 beqz $s3, loop_rows_end         # no more height for scanning
 	            lw $t8, screen_xbits
@@ -540,20 +558,30 @@
 						andi $a0, $t4, 0x3f		# object id
 						andi $a1, $t4, 0xc0		
 						srl  $a1, $a1, 6		# collision direction
-						jal collision_event
 						
-						# print collision object id
-						li $v0, 1
-						syscall
-						li $a0, ' '
-						li $v0, 11
-						syscall
-						add $a0, $a1, $zero
-						li $v0, 1
-						syscall
-						li $a0, '\n'
-						li $v0, 11
-						syscall
+						# if the object already collided, don't do that again
+						sll $t8, $a0, 2
+						lw $t8, blockCollided($t8)
+						bnez $t8, continue_scanning666
+							# call it 
+							jal collision_event
+							
+							# set collided tag 
+							sll $t8, $a0, 2
+							sw $a0, blockCollided($t8)
+						
+							# print collision object id
+							li $v0, 1
+							syscall
+							li $a0, ' '
+							li $v0, 11
+							syscall
+							add $a0, $a1, $zero
+							li $v0, 1
+							syscall
+							li $a0, '\n'
+							li $v0, 11
+							syscall
 						
 						continue_scanning666:
                         subi $s2, $s2, 1
@@ -579,22 +607,119 @@
 		fentry($ra,$s0,$s1,$s2)
 		fentry($s3)
 		
-		add $sp, $sp, -4
-		sw $ra, 0($sp)
+		# if target is a CR collision
+		# Test if this is a real corner collision or not
+		lw $t0, collisionCR
+		bne $a1, $t0, next_collision_0
+			jal getObjectLR
+			addi $t0, $v0, 0		# $t0 = object left
+			addi $t1, $v1, 0		# $t1 = object right
+			lw $t2, ballX			# $t2 = ball left
+			lw $t3, ballWidth		# 
+			add $t3, $t2, $t3		# $t3 = ball right
+			fentry($t0,$t1,$t2,$t3)
+			maxdiff($t0,$t1,$t2,$t3,$s0) # $s0 x direction max distance between object with ball
+			fexit($t0,$t1,$t2,$t3)
+			sub $t0, $t1, $t0
+			sub $t1, $t3, $t2
+			add $s1, $t0, $t1		# $s1 total width of two object
+			
+			jal getObjectTB
+			addi $t0, $v0, 0		# $t0 = object top
+			addi $t1, $v1, 0		# $t1 = object bottom
+			lw $t2, ballY			# $t2 = ball top
+			lw $t3, ballHeight		# 
+			add $t3, $t2, $t3		# $t3 = ball bottom
+			
+			fentry($t0,$t1,$t2,$t3)
+			maxdiff($t0,$t1,$t2,$t3,$s2) # $s2 y direction max distance between object with ball
+			fexit($t0,$t1,$t2,$t3)
+			
+			sub $t0, $t1, $t0
+			sub $t1, $t3, $t2
+			add $s3, $t0, $t1		# $s3 total height of two object
+			
+			slt $s0, $s0, $s1		# $s0 == 1 if two object intersect in x direction
+			slt $s1, $s2, $s3		# $s1 == 1 if two object intersect in y direction
+			sll $s0, $s0, 1
+			or $s0, $s0, $s1		# now $s0 is a two bit value, first bit for y and second bit for x
+			
+			li $t0, 1	# LR
+			li $t1, 2	# TB
+			li $t2, 0	# CR
+			li $t3, 3	# if the object id is 63, the ball must be hit by panel
+		
+			nop
+			nop
+			nop
+			nop
+			nop
+			nop
+			
+			beq $t0, $s0, set_as_LR
+			beq $t1, $s0, set_as_TB
+			beq $t2, $s0, be_yourself_CR
+			beq $t3, $s0, push
+			
+			set_as_LR:
+				lw $a1, collisionLR
+				j finally_done
+			set_as_TB:
+				lw $a1, collisionTB
+				j finally_done
+			push:
+				lw $a1, collisionPushByPanel
+				j finally_done
+			be_yourself_CR:
+				j finally_done
+			
+			finally_done:
+		
+			dprintc('c')
+			dprintc(':')
+			dprintr($a1)
+			dprintc('\n')
+			
 		
 		# test panel collision
 		next_collision_0:
 			lw $t0, panelObjectId
 			bne $t0, $a0, next_collision_1
 			
-			jal collision_change_ball_movement
+			lw $t1, collisionPushByPanel
+			bne $t1, $a1, ok_nothing
+			pushByPanel:
+				# TODO: let the ball follow the movement direction of panel when pushing
+				# TODO: Change the speed up fourmal
+				li $t0, -3
+				sw $t0, ballYMovement
+				sw $t0, ballMoved
+				lw $t0, ballSpeedX
+				sub $t0, $zero, $t0
+				sll $t0, $t0, 1
+				sw $t0, ballSpeedX
+				lw $t0, ballSpeedY
+				abs $t0, $t0
+				sub $t0, $zero, $t0
+				sll $t0, $t0, 1
+				sw $t0, ballSpeedY
+				
+				dprintc('P')
+				dprintc('\n')
+				
+				j next_collision_1
+						
+			ok_nothing:
+				# TODO: if the ball hitting on the middle of panel, decrase the speed
+				jal collision_change_ball_movement
 		
 		# test block collision
 		next_collision_1:
 			lw $t0, totBlocks
 			slt $t1, $a0, $t0
 			beqz $t1, next_collision_2
-			
+			# TODO: If the collision direction is LR, increase the speed of ball 
+			# TODO: If the block got special effect, increase the size of panel
 			setStatusDestoryed($a0)
 			
 			jal collision_change_ball_movement
@@ -604,10 +729,46 @@
 		fexit($s3)
 		fexit($ra,$s0,$s1,$s2)
 		jr $ra
+	
+	# this function return the left, right coordinate of specific object	
+	# $a0 = the specific id of that object
+	# $v0 = the left most coordinate 
+	# $v1 = the right most coordinate
+	getObjectLR:
+		lw $t0, panelObjectId
+		bne $t0, $a0, that_is_a_block
+			lw $v0, panelX
+			lw $v1, panelWidth
+			add $v1, $v0, $v1
+			jr $ra
+		that_is_a_block:
+			getXpos($a0, $v0)
+			lw $v1, block_width
+			add $v1, $v0, $v1
+			jr $ra
+			
+	# this function return the top, bottom coordinate of specific object	
+	# $a0 = the specific id of that object
+	# $v0 = the left most coordinate 
+	# $v1 = the right most coordinate
+	getObjectTB:
+		lw $t0, panelObjectId
+		bne $t0, $a0, that_is_a_block2
+			lw $v0, panelY
+			# oops we represent the panel like always 1 pixel height
+			addi $v1, $v0, 1
+			jr $ra
+		that_is_a_block2:
+			getYpos($a0, $v0)
+			lw $v1, block_height
+			add $v1, $v0, $v1
+			jr $ra	
 		
 	# Change ball movement based on collision direction code
+	# $a0: the object id 
 	# $a1: the direction code
 	collision_change_ball_movement:
+		# TODO: bugfix, there is a change one block trigger twice collision event
 		lw $t0, collisionLR
 		lw $t1, collisionTB
 		lw $t2, collisionCR
@@ -616,7 +777,17 @@
 		beq $t2, $a1, collisionCR_movement
 		jr $ra
 		collisionCR_movement:
-			# TODO: Implement CR movement		
+			sw $zero, ballXMovement
+			sw $zero, ballYMovement
+			lw $t0, ballSpeedX
+			sub $t0, $zero, $t0
+			sw $t0, ballSpeedX
+			lw $t0, ballSpeedY
+			sub $t0, $zero, $t0
+			sw $t0, ballSpeedY
+			dprintc('R')
+			dprintc('\n')
+			jr $ra
 		
 		collisionLR_movement:
 			sw $zero, ballXMovement
@@ -624,6 +795,8 @@
 			lw $t0, ballSpeedX
 			sub $t0, $zero, $t0
 			sw $t0, ballSpeedX
+			dprintc('L')
+			dprintc('\n')
 			jr $ra
 		collisionTB_movement:
 			sw $zero, ballXMovement
@@ -631,6 +804,10 @@
 			lw $t0, ballSpeedY
 			sub $t0, $zero, $t0
 			sw $t0, ballSpeedY
+			dprintc('T')
+			dprintc('\n')
+			jr $ra
+	
 	# this subroutine calcuate the max distance between two integer set {$a0, $a1}, {$a2, $a3}
 	_maxdiff:
 		sub $t0, $a0, $a3
@@ -702,8 +879,8 @@
 			jal drawline
 			
 			# draw it with movement
-			lw $t0, collisionLR
-			lw $t1, collisionTB
+			lw $t0, collisionCR
+			lw $t1, collisionCR
 			sll $t0, $t0, 6
 			sll $t1, $t1, 6
 			lw $t2, panelObjectId
@@ -738,7 +915,6 @@
 			# done
 			
 		testBlocks:
-			# TODO: Implement block render it :(
 			li $s0, 0
 			lw $s1, totBlocks
 				loop_blockDestoryed_check:
