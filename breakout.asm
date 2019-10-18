@@ -18,6 +18,25 @@
 	lw $v0, preg+8
 .end_macro
 
+.macro dprintr(%reg)
+	sw $a0, jreg+0
+	sw $v0, jreg+4
+	add $a0, %reg, $zero
+	li $v0, 1
+	syscall
+	lw $a0, jreg+0
+	lw $v0, jreg+4
+.end_macro
+.macro dprintc(%chr)
+	sw $a0, jreg+0
+	sw $v0, jreg+4
+	li $a0, %chr
+	li $v0, 11
+	syscall
+	lw $a0, jreg+0
+	lw $v0, jreg+4
+.end_macro
+
 .macro setFirstPixelPayload(%id, %direction)
 	sw $t7, preg+0
 	lw $t7, %direction
@@ -43,6 +62,62 @@
 	lw $t7, preg+0
 .end_macro
 
+.macro maxdiff(%a0,%a1,%a2,%a3,%res)
+	fentry($a0,$a1,$a2,$a3)
+	add $a0, %a0, $zero
+	add $a1, %a1, $zero
+	add $a2, %a2, $zero
+	add $a3, %a3, $zero
+	jal _maxdiff
+	add %res, $v0, $zero
+	fexit($a0,$a1,$a2,$a3)
+.end_macro
+
+.macro fentry(%a)
+	addi $sp, $sp, -4
+	sw %a, 0($sp)
+.end_macro
+.macro fentry(%a,%b)
+	addi $sp, $sp, -8
+	sw %a, 0($sp)
+	sw %b, 4($sp)
+.end_macro
+.macro fentry(%a,%b,%c)
+	addi $sp, $sp, -12
+	sw %a, 0($sp)
+	sw %b, 4($sp)
+	sw %c, 8($sp)
+.end_macro
+.macro fentry(%a,%b,%c,%d)
+	addi $sp, $sp, -16
+	sw %a,  0($sp)
+	sw %b,  4($sp)
+	sw %c,  8($sp)
+	sw %d, 12($sp)
+.end_macro
+
+.macro fexit(%a)
+	lw %a, 0($sp)
+	addi $sp, $sp, 4
+.end_macro
+.macro fexit(%a,%b)
+	lw %a, 0($sp)
+	lw %b, 4($sp)
+	addi $sp, $sp, 8
+.end_macro
+.macro fexit(%a,%b,%c)
+	lw %a, 0($sp)
+	lw %b, 4($sp)
+	lw %c, 8($sp)
+	addi $sp, $sp, 12
+.end_macro
+.macro fexit(%a,%b,%c,%d)
+	lw %a,  0($sp)
+	lw %b,  4($sp)
+	lw %c,  8($sp)
+	lw %d, 12($sp)
+	addi $sp, $sp, 16
+.end_macro
 
 .macro getXpos(%block_id,%save_target)
 	sw %block_id, preg+0
@@ -376,11 +451,7 @@
 # collisionHandler {{{
 
 	collisionHandler:
-
-        addi $sp, $sp, -12
-        sw $s0, 0($sp)
-        sw $s1, 4($sp)
-        sw $ra, 8($sp)
+        fentry($s0,$s1,$ra)
 	
 		handleBall:
 
@@ -419,8 +490,8 @@
 				sub $t0, $zero, $t0		# negative speed-x
 				sw $t0, ballSpeedX
 				j afterCollision
-								
-									
+
+
 			on_bottomWallCollision:	
 				li $t0, 1
 				sw $t0, ballTouchBottomWall
@@ -497,10 +568,7 @@
 
 		onCollisionHandlerExit:
 
-        lw $s0, 0($sp)
-        lw $s1, 4($sp)
-        lw $ra, 8($sp)
-        addi $sp, $sp, 12
+        fexit($s0,$s1,$ra)
 		
 		jr $ra
 		
@@ -508,6 +576,8 @@
 	# $a0: the id of object who collide with ball
 	# $a1: the direction code 
 	collision_event:
+		fentry($ra,$s0,$s1,$s2)
+		fentry($s3)
 		
 		add $sp, $sp, -4
 		sw $ra, 0($sp)
@@ -531,9 +601,8 @@
 			
 		next_collision_2:
 		
-		lw $ra, 0($sp)
-		add $sp, $sp, 4
-		
+		fexit($s3)
+		fexit($ra,$s0,$s1,$s2)
 		jr $ra
 		
 	# Change ball movement based on collision direction code
@@ -562,6 +631,25 @@
 			lw $t0, ballSpeedY
 			sub $t0, $zero, $t0
 			sw $t0, ballSpeedY
+	# this subroutine calcuate the max distance between two integer set {$a0, $a1}, {$a2, $a3}
+	_maxdiff:
+		sub $t0, $a0, $a3
+		sub $t1, $a3, $a0
+		sub $t2, $a1, $a2
+		sub $t3, $a2, $a1
+			bge $t0, $t1, t0_is_bigger
+			add $t0, $t1, $zero
+			t0_is_bigger:
+			bge $t2, $t3, t2_is_bigger
+			add $t2, $t3, $zero
+			t2_is_bigger:
+			
+		bge $t2, $t0, t2_is_bigger2
+		t0_is_bigger2:
+			add $v0, $t0, $zero
+			jr $ra
+		t2_is_bigger2:
+			add $v0, $t2, $zero
 			jr $ra
 		
 # }}}
@@ -766,8 +854,7 @@
 	# draw Pixel art
 	# $a0, the beginning of pixel art array address, each entry are 3 word long, represent [x,y,color]. The array is null-terminated, means [0,0,0]		
 	drawPixelArt:
-		add $sp, $sp, -4
-		sw $a0, 0($sp)
+		fentry($a0)
 		
 		keep_drawing_pixelart:
 			lw $t0, 0($a0)
@@ -798,8 +885,7 @@
 			j keep_drawing_pixelart
 		stop_drawing_pixelart:
 		
-		lw $a0, 0($sp)
-		add $sp, $sp, 4
+		fexit($a0)
 		jr $ra
 	
 
@@ -854,19 +940,9 @@
 	# $a0, the block id
 	# $a1, indicate that wipe out this block from bitmap
 	drawBlock:
-		addi $sp, $sp, -48
-		sw $a0, 0($sp)
-		sw $a1, 4($sp)
-		sw $a2, 8($sp)
-		sw $a3, 12($sp)
-		sw $ra, 16($sp)
-		sw $s0, 20($sp)
-		sw $s1, 24($sp)
-		sw $s2, 28($sp)
-		sw $s3, 32($sp)
-		sw $s4, 36($sp)
-		sw $s7, 40($sp)
-		sw $s6, 44($sp)
+		fentry($a0,$a1,$a2,$a3)
+		fentry($s0,$s1,$s2,$s3)
+		fentry($s4,$s6,$s7,$ra)
 		add $s7, $a0, $zero 		# $s7 = the id of block
 		add $s6, $a1, $zero			# $s6 = indicate balabala
 		
@@ -928,20 +1004,9 @@
 		end_if_0003:
 		jal drawline
 
-		lw $a0, 0($sp)
-		lw $a1, 4($sp)
-		lw $a2, 8($sp)
-		lw $a3, 12($sp)
-		lw $ra, 16($sp)
-		lw $s0, 20($sp)
-		lw $s1, 24($sp)
-		lw $s2, 28($sp)
-		lw $s3, 32($sp)
-		lw $s4, 36($sp)
-		lw $s7, 40($sp)
-		lw $s6, 44($sp)
-		addi $sp, $sp, 48
-		
+		fexit($s4,$s6,$s7,$ra)
+		fexit($s0,$s1,$s2,$s3)
+		fexit($a0,$a1,$a2,$a3)		
 		# exit function
 		jr $ra
 
@@ -951,10 +1016,7 @@
 
 	# This method draw a line between [$a0, $a1) with color $a3 on y $a2
 	drawline:
-		addi $sp, $sp, -16
-		sw $a0, 0($sp)
-		sw $a1, 4($sp)
-		sw $a2, 8($sp)
+		fentry($a0,$a1,$a2)
 		
 		# loading extra argument from global :p
 		# this is a hack, Don't do it at home
@@ -995,11 +1057,7 @@
 		or $t1, $a3, $t7				# compose payload with color code
 		sw $t1, 0x10040000($a0)			# store it back
 		
-		lw $a0, 0($sp)
-		lw $a1, 4($sp)
-		lw $a2, 8($sp)
-		addi $sp, $sp, 16
-		
+		fexit($a0,$a1,$a2)
 		jr $ra
 
 # }}}
