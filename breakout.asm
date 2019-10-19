@@ -328,6 +328,17 @@
 	# allocate space
 	jal allocMemory
 	
+	# Clean screen on start up
+	li $t0, 0
+	lw $t1, screen_ysize
+	lw $t2, screen_xbits
+	sll $t1, $t1, 2
+	sllv $t1, $t1, $t2
+	clearScreen:
+		sw $zero, 0x10040000($t0)
+		addi $t0, $t0, 4
+		bne $t0, $t1, clearScreen
+	
 	# init Blocks
 	li $s0, 0
 	lw $s1, totBlocks
@@ -336,8 +347,6 @@
 		addi $s0, $s0, 1
 		bne $s0, $s1, drawBlocksloop
 	drawBlocksloopExit:
-	
-	# TODO: Clean screen on start up
 	
 	# init system time
 	li $v0, 30			# retrieve system time in ms unit
