@@ -262,11 +262,11 @@
 	ballFollowPanel:  	.word  1
 	ballFollowOffsetX: 	.word  5
 	ballFollowOffsetY:  .word -5
-    ballInitialSpeedX:  .word  300
-    ballInitialSpeedY:  .word -150
+    ballInitialSpeedX:  .word  300		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSignX
+    ballInitialSpeedY:  .word  150		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSignY
     ballTouchBottomWall: .word 0
-    ballSpeedSignX: .word 1
-    ballSpeedSignY: .word 1
+    ballSpeedSignX: .word  1
+    ballSpeedSignY: .word -1
     ballBonusSpeed: .word 0
     
     ballProgressSpeed: .word 0			# the progress speed for breaking a block
@@ -508,29 +508,41 @@
 	
 	# Reverse the speed of Y direction
 	ballReverseYSpeed:
-		fentry($ra)
 		lw $t0, ballSpeedSignY
 		sub $t0, $zero, $t0
 		sw $t0, ballSpeedSignY
 		li $t0, 1
 		sw $t0, requireSpeedUpdate
-		fexit($ra)
+		
 		jr $ra
+		
+	# $a0, the x direction. 1 move right, -1 move left, 0 no changes
+	# $a1, the y direction. 1 move down, -1 move up, 0 no changes
+	setBallDirection:
+		
+		setX:
+			beqz $a0, setY
+			lw $a0, ballSpeedSignX
+		setY:
+			beqz $a1, okkkk
+			lw $a1, ballSpeedSignY
+			
+		okkkk:
+			jr $ra
+		
 	
 	# Reverse the speed of X direction
 	ballReverseXSpeed:
-		fentry($ra)
 		lw $t0, ballSpeedSignX
 		sub $t0, $zero, $t0
 		sw $t0, ballSpeedSignX
 		li $t0, 1
 		sw $t0, requireSpeedUpdate
-		fexit($ra)
+		
 		jr $ra
 	
 	# $a0: the speed gonna increase	
 	increaseBonusSpeed:
-		fentry($ra)
 		lw $t0, ballBonusSpeed
 		add $t0, $t0, $a0
 		
@@ -550,17 +562,17 @@
 		
 		li $t0, 1
 		sw $t0, requireSpeedUpdate
-		fexit($ra)
+		
 		jr $ra
 		
 	increaseProgressSpeed:
-		fentry($ra)
+
 		lw $t0, ballProgressSpeed
 		add $t0, $t0, $a0
 		sw $t0, ballProgressSpeed
 		li $t0, 1
 		sw $t0, requireSpeedUpdate
-		fexit($ra)
+
 		jr $ra
 		
 	# update the ball speed
@@ -854,17 +866,34 @@
 			lw $t1, collisionPushByPanel
 			bne $t1, $a1, ok_nothing
 			pushByPanel:
-				# TODO: let the ball follow the movement direction of panel when pushing
 				li $t0, -3
 				sw $t0, ballYMovement
 				sw $t0, ballMoved
 
 				fentry($a0)
-				lw $a0, ballPushForce
-				jal increaseProgressSpeed
+					# increase speed due to pushing
+					lw $a0, ballPushForce
+					jal increaseProgressSpeed
 				fexit($a0)
-				jal ballReverseXSpeed
-				jal ballReverseYSpeed
+				
+				# change ball direction based on the pushing direction
+				fentry($a0, $a1)
+					lw $a0, panelMovement
+					sge $a0, $a0, $zero
+					bnez $a0, postive		# if movement >  0
+					slt $a0, $a0, $zero
+					bnez $a0, negative		# if movement <  0
+					li $a0, 0				# if movement == 0
+					j ok6666
+						negative:
+							li $a0, -1
+						postive:
+							li $a0,  1
+						ok6666:
+					li $a1, -1
+					
+					jal setBallDirection
+				fexit($a0,$a1)
 				
 				dprintc('P')
 				dprintc('\n')
