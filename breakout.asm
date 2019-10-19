@@ -216,6 +216,7 @@
 	frame:		  .word 0		# current frame index, that mean this game can run continusely about 24 days 
 	keyLeftMovement:  .word -6	
 	keyRightMovement: .word  6
+	
 	# Blocks
 	# xpos, ypos, color, destroyed
 	blocks: .word  
@@ -224,14 +225,16 @@
           4, 10,     255, 0, 20, 10,     255, 0, 36, 10,     255, 0, 52, 10,     255, 0, 68, 10,     255, 0, 84, 10,     255, 0,100, 10,     255, 0,116, 10,     255, 0,
          12, 15,16776960, 0, 28, 15,16776960, 0, 44, 15,16776960, 0, 60, 15,16776960, 0, 76, 15,16776960, 0, 92, 15,16776960, 0,108, 15,16776960, 0,
           4, 20,16711935, 0, 20, 20,16711935, 0, 36, 20,16711935, 0, 52, 20,16711935, 0, 68, 20,16711935, 0, 84, 20,16711935, 0,100, 20,16711935, 0,116, 20,16711935, 0,
-         12, 25,   65535, 0, 28, 25,   65535, 0, 44, 25,   65535, 0, 60, 25,   65535, 0, 76, 25,   65535, 0, 92, 25,   65535, 0,108, 25,   65535, 0
+         12, 25,   65535, 0, 28, 25,   65535, 0, 44, 25,   65535, 0, 60, 25,   65535, 0, 76, 25,   65535, 0, 92, 25,0xe95cff, 2,108, 25,   65535, 0
     blockCollided: .word 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 					     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 					     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 					     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    blockStatusDestroyed: .word 0x1
-    blockStatusBonus: 	  .word 0x2
-    blockRemaining:		  .word 45
+    blockStatusDestroyed:   .word 0x1
+    blockStatusSpecial:		.word 0x2
+    blockRemaining:		    .word 45
+    blockProgressSpeed:	    .word 30
+  
     
     # panel
 	panelX: 	.word 58
@@ -241,6 +244,7 @@
 	panelMovement:  .word 0
 	panelColor: .word 0x00ffffff
 	panelObjectId: .word 63
+	panelStretch: .word 0
 
 	# ball
 	ballX:		.word 63
@@ -258,9 +262,20 @@
 	ballFollowPanel:  	.word  1
 	ballFollowOffsetX: 	.word  5
 	ballFollowOffsetY:  .word -5
-    ballInitialSpeedX:  .word  300
-    ballInitialSpeedY:  .word -150
+    ballInitialSpeedX:  .word  300		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSignX
+    ballInitialSpeedY:  .word  150		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSignY
     ballTouchBottomWall: .word 0
+    ballSpeedSignX: .word  1
+    ballSpeedSignY: .word -1
+    ballBonusSpeed: .word 0
+    
+    ballProgressSpeed: .word 0			# the progress speed for breaking a block
+    ballPushForce: .word 256			# the bonus speed for panel pushing
+    blockCollisionLRSpeed: .word 64		# the bonus speed for LR collision
+    ballCollideCenter: .word -128		# the bonus speed for panel center collision
+    
+    bonusSpeedMaximum: .word  1600
+    bonusSpeedMinimum: .word -512
     
     # collision code
     collisionCR: .word 3
@@ -273,6 +288,8 @@
     drawline_firstPixelPayload: 	.word 0
     drawline_lastPixelPayload:   	.word 0
     drawline_middlePixelPayload:	.word 0
+    
+    requireSpeedUpdate: .word 0
 	
 	# last frame system time
 	lastms: 	.word 0
@@ -313,6 +330,17 @@
 	# allocate space
 	jal allocMemory
 	
+	# Clean screen on start up
+	li $t0, 0
+	lw $t1, screen_ysize
+	lw $t2, screen_xbits
+	sll $t1, $t1, 2
+	sllv $t1, $t1, $t2
+	clearScreen:
+		sw $zero, 0x10040000($t0)
+		addi $t0, $t0, 4
+		bne $t0, $t1, clearScreen
+	
 	# init Blocks
 	li $s0, 0
 	lw $s1, totBlocks
@@ -321,8 +349,6 @@
 		addi $s0, $s0, 1
 		bne $s0, $s1, drawBlocksloop
 	drawBlocksloopExit:
-	
-	# TODO: Clean screen on start up
 	
 	# init system time
 	li $v0, 30			# retrieve system time in ms unit
@@ -362,8 +388,29 @@
 # gameCheck {{{
 
 	gameCheck:
-	
-		# TODO: speed up ball speed base on remaining blocks
+		fentry($ra)
+		
+		# stretch the panel
+		panelStretchingTest:
+			lw $t0, panelStretch
+			beqz $t0, speedUpdateTest
+				lw $t1, panelX
+				sub $t1, $t1, $t0
+				sw $t1, panelX		# move panelX
+				lw $t1, panelWidth
+				add $t1, $t1, $t0
+				add $t1, $t1, $t0
+				sw $t1, panelWidth	# increase panelWidth 
+				li $t0, 1
+				sw $t0, panelMoved	# set panelMoved on
+				sw $zero, panelStretch
+		
+		# require speed update
+		speedUpdateTest:
+			lw $t0, requireSpeedUpdate
+			beqz $t0, winTest
+				jal updateSpeed
+				sw $zero, requireSpeedUpdate
 	
 		# test if all blocks been destroyed
 		winTest:
@@ -383,6 +430,7 @@
 				sw $t1, uLose
 		
 		gameCheck_Exit:
+		fexit($ra)
 		jr $ra
 
 # }}}
@@ -457,6 +505,140 @@
 
 # }}}
 	
+# ball speed & direction {{{
+	
+	# Reverse the speed of Y direction
+	ballReverseYSpeed:
+		lw $t0, ballSpeedSignY
+		sub $t0, $zero, $t0
+		sw $t0, ballSpeedSignY
+		li $t0, 1
+		sw $t0, requireSpeedUpdate
+		
+		jr $ra
+		
+	# $a0, the x direction. 1 move right, -1 move left, 0 no changes
+	# $a1, the y direction. 1 move down, -1 move up, 0 no changes
+	setBallDirection:
+		
+		setX:
+			beqz $a0, setY
+			lw $a0, ballSpeedSignX
+		setY:
+			beqz $a1, okkkk
+			lw $a1, ballSpeedSignY
+			
+		okkkk:
+			jr $ra
+		
+	
+	# Reverse the speed of X direction
+	ballReverseXSpeed:
+		lw $t0, ballSpeedSignX
+		sub $t0, $zero, $t0
+		sw $t0, ballSpeedSignX
+		li $t0, 1
+		sw $t0, requireSpeedUpdate
+		
+		jr $ra
+	
+	# $a0: the speed gonna increase	
+	increaseBonusSpeed:
+		lw $t0, ballBonusSpeed
+		add $t0, $t0, $a0
+		
+		# trim bonus speed value if exceed its max/min value
+		lw $t1, bonusSpeedMaximum
+			sgt $t2, $t0, $t1
+			beqz $t2, valueOk1
+			add $t0, $t1, $zero
+		valueOk1:
+		lw $t1, bonusSpeedMinimum
+			slt $t2, $t0, $t1
+			beqz $t2, valueOk2
+			add $t0, $t1, $zero
+		valueOk2:
+		
+		sw $t0, ballBonusSpeed
+		
+		li $t0, 1
+		sw $t0, requireSpeedUpdate
+		
+		jr $ra
+		
+	increaseProgressSpeed:
+
+		lw $t0, ballProgressSpeed
+		add $t0, $t0, $a0
+		sw $t0, ballProgressSpeed
+		li $t0, 1
+		sw $t0, requireSpeedUpdate
+
+		jr $ra
+		
+	# update the ball speed
+	updateSpeed:
+		# formula for speed: speedSign * initialSpeed * ( 1 + progress speed / 1024 ) * ( 1 + bonus speed / 1024 ) 
+		# speedSign will be 1 or -1, based on the moving direction. Change when collision with wall or blocks
+		# progress speed come from game progress, every time a block been destroyed, the value increase.
+		# bonus speed based on other event. e.g. ball pushed by panel / ball hitting on the center of board
+		fentry($s0,$s1,$s2,$s3)
+		
+		lw $s0, ballInitialSpeedX
+		lw $s1, ballProgressSpeed
+		lw $s2, ballBonusSpeed
+		li $s3, 1024
+		add $s1, $s1, $s3
+		add $s2, $s2, $s3
+		mtc1 $s0, $f0			# load everything into coprocesss1 registers
+		mtc1 $s1, $f1
+		mtc1 $s2, $f2
+		mtc1 $s3, $f3
+		cvt.s.w $f0, $f0		# convert them into single floating point value
+		cvt.s.w $f1, $f1
+		cvt.s.w $f2, $f2
+		cvt.s.w $f3, $f3
+		div.s $f1, $f1, $f3		# doing calculate
+		div.s $f2, $f2, $f3
+		mul.s $f0, $f0, $f1
+		mul.s $f0, $f0, $f2
+		cvt.w.s $f0, $f0
+		mfc1 $s0, $f0			# get the speed
+		
+		lw $s1, ballSpeedSignX
+		mul $s0, $s0, $s1
+		sw $s0, ballSpeedX
+				
+		lw $s0, ballInitialSpeedY
+		lw $s1, ballProgressSpeed
+		lw $s2, ballBonusSpeed
+		li $s3, 1024
+		add $s1, $s1, $s3
+		add $s2, $s2, $s3
+		mtc1 $s0, $f0			# load everything into coprocesss1 registers
+		mtc1 $s1, $f1
+		mtc1 $s2, $f2
+		mtc1 $s3, $f3
+		cvt.s.w $f0, $f0		# convert them into single floating point value
+		cvt.s.w $f1, $f1
+		cvt.s.w $f2, $f2
+		cvt.s.w $f3, $f3
+		div.s $f1, $f1, $f3		# doing calculate
+		div.s $f2, $f2, $f3
+		mul.s $f0, $f0, $f1
+		mul.s $f0, $f0, $f2
+		cvt.w.s $f0, $f0
+		mfc1 $s0, $f0			# get the speed
+		
+		lw $s1, ballSpeedSignY
+		mul $s0, $s0, $s1
+		sw $s0, ballSpeedY
+		
+		fexit($s0,$s1,$s2,$s3)
+		jr $ra
+		
+# }}}
+	
 # collisionHandler {{{
 
 	collisionHandler:
@@ -495,9 +677,7 @@
 			
 			on_leftWallCollision:
 			on_rightWallCollision:
-				lw $t0, ballSpeedX
-				sub $t0, $zero, $t0		# negative speed-x
-				sw $t0, ballSpeedX
+				jal ballReverseXSpeed
 				j afterCollision
 
 
@@ -505,9 +685,7 @@
 				li $t0, 1
 				sw $t0, ballTouchBottomWall
 			on_topWallCollision:
-				lw $t0, ballSpeedY
-				sub $t0, $zero, $t0
-				sw $t0, ballSpeedY		# negative speed-y
+				jal ballReverseYSpeed
 				j afterCollision
 				
 			afterCollision:
@@ -689,20 +867,34 @@
 			lw $t1, collisionPushByPanel
 			bne $t1, $a1, ok_nothing
 			pushByPanel:
-				# TODO: let the ball follow the movement direction of panel when pushing
-				# TODO: Change the speed up fourmal
 				li $t0, -3
 				sw $t0, ballYMovement
 				sw $t0, ballMoved
-				lw $t0, ballSpeedX
-				sub $t0, $zero, $t0
-				sll $t0, $t0, 1
-				sw $t0, ballSpeedX
-				lw $t0, ballSpeedY
-				abs $t0, $t0
-				sub $t0, $zero, $t0
-				sll $t0, $t0, 1
-				sw $t0, ballSpeedY
+
+				fentry($a0)
+					# increase speed due to pushing
+					lw $a0, ballPushForce
+					jal increaseProgressSpeed
+				fexit($a0)
+				
+				# change ball direction based on the pushing direction
+				fentry($a0, $a1)
+					lw $a0, panelMovement
+					sge $a0, $a0, $zero
+					bnez $a0, postive		# if movement >  0
+					slt $a0, $a0, $zero
+					bnez $a0, negative		# if movement <  0
+					li $a0, 0				# if movement == 0
+					j ok6666
+						negative:
+							li $a0, -1
+						postive:
+							li $a0,  1
+						ok6666:
+					li $a1, -1
+					
+					jal setBallDirection
+				fexit($a0,$a1)
 				
 				dprintc('P')
 				dprintc('\n')
@@ -710,7 +902,34 @@
 				j next_collision_1
 						
 			ok_nothing:
-				# TODO: if the ball hitting on the middle of panel, decrase the speed
+			
+				# Test if the ball hitting the center of panel
+				# Center area will be half of the panel, and locate in the middle of panel.
+				# if the bottom center spot of ball intersect with the center area, we call this center collision
+				# and we decrease the speed of ball
+				lw $t0, panelX
+				lw $t1, panelWidth
+				srl $t1, $t1, 1
+				add $t0, $t0, $t1		# $t0 = the center point
+				lw $t1, ballX
+				lw $t2, ballWidth
+				srl $t2, $t2, 1
+				add $t1, $t1, $t2		# t1 = the bottom center point
+				
+				sub $t0, $t0, $t1
+				abs $t0, $t0			# the distance between two point
+				lw $t1, panelWidth
+				srl $t1, $t1, 1
+				slt $t0, $t0, $t1		# test if the ball hitting the center area
+				beqz $t0, ok_nothing2
+					
+					fentry($a0)
+						lw $a0, ballCollideCenter
+						jal increaseBonusSpeed
+					fexit($a0)
+			
+			ok_nothing2:
+				
 				jal collision_change_ball_movement
 		
 		# test block collision
@@ -718,8 +937,29 @@
 			lw $t0, totBlocks
 			slt $t1, $a0, $t0
 			beqz $t1, next_collision_2
-			# TODO: If the collision direction is LR, increase the speed of ball 
-			# TODO: If the block got special effect, increase the size of panel
+			
+			fentry($a0)
+				# increase progress speed because this block been destroyed
+				lw $a0, blockProgressSpeed
+				jal increaseProgressSpeed
+				# increase bonus speed if this is a LR collision
+				lw $t8, collisionLR
+				bne $t8, $a1, notLR
+					lw $a0, blockCollisionLRSpeed
+					jal increaseBonusSpeed
+				notLR:
+			fexit($a0)
+			
+			# test if this is a special block
+			getStatus($a0, $t0)
+			lw $t1, blockStatusSpecial
+			and $t0, $t1, $t0
+				beqz $t0, you_are_mediocre
+				# scretch the length of panel on next frame
+				li $t0, 2
+				sw $t0, panelStretch
+			you_are_mediocre:
+			
 			setStatusDestoryed($a0)
 			
 			jal collision_change_ball_movement
@@ -768,45 +1008,41 @@
 	# $a0: the object id 
 	# $a1: the direction code
 	collision_change_ball_movement:
-		# TODO: bugfix, there is a change one block trigger twice collision event
+		fentry($ra)
 		lw $t0, collisionLR
 		lw $t1, collisionTB
 		lw $t2, collisionCR
 		beq $t0, $a1, collisionLR_movement
 		beq $t1, $a1, collisionTB_movement
 		beq $t2, $a1, collisionCR_movement
-		jr $ra
+		j collisionMovement_end
+		
 		collisionCR_movement:
 			sw $zero, ballXMovement
 			sw $zero, ballYMovement
-			lw $t0, ballSpeedX
-			sub $t0, $zero, $t0
-			sw $t0, ballSpeedX
-			lw $t0, ballSpeedY
-			sub $t0, $zero, $t0
-			sw $t0, ballSpeedY
+			jal ballReverseXSpeed
+			jal ballReverseYSpeed
 			dprintc('R')
 			dprintc('\n')
-			jr $ra
+			j collisionMovement_end
 		
 		collisionLR_movement:
 			sw $zero, ballXMovement
 			sw $zero, ballYMovement
-			lw $t0, ballSpeedX
-			sub $t0, $zero, $t0
-			sw $t0, ballSpeedX
+			jal ballReverseXSpeed
 			dprintc('L')
 			dprintc('\n')
-			jr $ra
+			j collisionMovement_end
 		collisionTB_movement:
 			sw $zero, ballXMovement
 			sw $zero, ballYMovement
-			lw $t0, ballSpeedY
-			sub $t0, $zero, $t0
-			sw $t0, ballSpeedY
+			jal ballReverseYSpeed
 			dprintc('T')
 			dprintc('\n')
-			jr $ra
+			
+		collisionMovement_end:
+		fexit($ra)
+		jr $ra
 	
 	# this subroutine calcuate the max distance between two integer set {$a0, $a1}, {$a2, $a3}
 	_maxdiff:
@@ -844,6 +1080,7 @@
 			beqz $t0, testBlocks	# test if panel moved
 			sw $zero, panelMoved	# reset flag
 			
+			# TODO: determine overflow somewhere else
 			# test if the movement will go beyond the screen
 			lw $t0, panelX
 			lw $t1, panelMovement
@@ -903,6 +1140,7 @@
 			add $t1, $t1, $t0
 			sw $t1, panelX
 			
+			# TODO: move this part of code to somewhere else, this should never done in a render.
 			# determine if the ball should follow the panel
 				lw $t0, ballFollowPanel
 				beqz $t0, a
@@ -1071,6 +1309,7 @@
 
 	# handle input
 	handleInput:
+		fentry($ra)
 		lw $t1, 0xffff0000
 		andi $t1, $t1, 0x1
 		beqz $t1, handleInput_exit
@@ -1098,13 +1337,12 @@
 		
 		shoot_ball:
             sw $zero, ballFollowPanel
-            lw $t0, ballInitialSpeedX
-            sw $t0, ballSpeedX
-            lw $t0, ballInitialSpeedY
-            sw $t0, ballSpeedY
+            li $t0, 1
+			sw $t0, requireSpeedUpdate
 			j handleInput_exit
 		
 		handleInput_exit:
+			fexit($ra)
 			jr $ra	
 		
 	# allocate space for bitmap
