@@ -225,15 +225,15 @@
           4, 10,     255, 0, 20, 10,     255, 0, 36, 10,     255, 0, 52, 10,     255, 0, 68, 10,     255, 0, 84, 10,     255, 0,100, 10,     255, 0,116, 10,     255, 0,
          12, 15,16776960, 0, 28, 15,16776960, 0, 44, 15,16776960, 0, 60, 15,16776960, 0, 76, 15,16776960, 0, 92, 15,16776960, 0,108, 15,16776960, 0,
           4, 20,16711935, 0, 20, 20,16711935, 0, 36, 20,16711935, 0, 52, 20,16711935, 0, 68, 20,16711935, 0, 84, 20,16711935, 0,100, 20,16711935, 0,116, 20,16711935, 0,
-         12, 25,   65535, 0, 28, 25,   65535, 0, 44, 25,   65535, 0, 60, 25,   65535, 0, 76, 25,   65535, 0, 92, 25,   65535, 0,108, 25,   65535, 0
+         12, 25,   65535, 0, 28, 25,   65535, 0, 44, 25,   65535, 0, 60, 25,   65535, 0, 76, 25,   65535, 0, 92, 25,0xe95cff, 2,108, 25,   65535, 0
     blockCollided: .word 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 					     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 					     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 					     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    blockStatusDestroyed: .word 0x1
-    blockStatusBonus: 	  .word 0x2
-    blockRemaining:		  .word 45
-    blockProgressSpeed:	  .word 30
+    blockStatusDestroyed:   .word 0x1
+    blockStatusSpecial:		.word 0x2
+    blockRemaining:		    .word 45
+    blockProgressSpeed:	    .word 30
   
     
     # panel
@@ -244,6 +244,7 @@
 	panelMovement:  .word 0
 	panelColor: .word 0x00ffffff
 	panelObjectId: .word 63
+	panelStretch: .word 0
 
 	# ball
 	ballX:		.word 63
@@ -387,6 +388,22 @@
 
 	gameCheck:
 		fentry($ra)
+		
+		# stretch the panel
+		panelStretchingTest:
+			lw $t0, panelStretch
+			beqz $t0, speedUpdateTest
+				lw $t1, panelX
+				sub $t1, $t1, $t0
+				sw $t1, panelX		# move panelX
+				lw $t1, panelWidth
+				add $t1, $t1, $t0
+				add $t1, $t1, $t0
+				sw $t1, panelWidth	# increase panelWidth 
+				li $t0, 1
+				sw $t0, panelMoved	# set panelMoved on
+				sw $zero, panelStretch
+		
 		# require speed update
 		speedUpdateTest:
 			lw $t0, requireSpeedUpdate
@@ -875,7 +892,17 @@
 					jal increaseBonusSpeed
 				notLR:
 			fexit($a0)
-			# TODO: If the block got special effect, increase the size of panel
+			
+			# test if this is a special block
+			getStatus($a0, $t0)
+			lw $t1, blockStatusSpecial
+			and $t0, $t1, $t0
+				beqz $t0, you_are_mediocre
+				# scretch the length of panel on next frame
+				li $t0, 2
+				sw $t0, panelStretch
+			you_are_mediocre:
+			
 			setStatusDestoryed($a0)
 			
 			jal collision_change_ball_movement
@@ -996,6 +1023,7 @@
 			beqz $t0, testBlocks	# test if panel moved
 			sw $zero, panelMoved	# reset flag
 			
+			# TODO: determine overflow somewhere else
 			# test if the movement will go beyond the screen
 			lw $t0, panelX
 			lw $t1, panelMovement
@@ -1055,6 +1083,7 @@
 			add $t1, $t1, $t0
 			sw $t1, panelX
 			
+			# TODO: move this part of code to somewhere else, this should never done in a render.
 			# determine if the ball should follow the panel
 				lw $t0, ballFollowPanel
 				beqz $t0, a
