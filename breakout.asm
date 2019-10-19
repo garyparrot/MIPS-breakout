@@ -272,9 +272,10 @@
     ballProgressSpeed: .word 0			# the progress speed for breaking a block
     ballPushForce: .word 256			# the bonus speed for panel pushing
     blockCollisionLRSpeed: .word 64		# the bonus speed for LR collision
+    ballCollideCenter: .word -128		# the bonus speed for panel center collision
     
     bonusSpeedMaximum: .word  1600
-    bonusSpeedMinimum: .word -1600
+    bonusSpeedMinimum: .word -512
     
     # collision code
     collisionCR: .word 3
@@ -901,7 +902,34 @@
 				j next_collision_1
 						
 			ok_nothing:
-				# TODO: if the ball hitting on the middle of panel, decrase the speed
+			
+				# Test if the ball hitting the center of panel
+				# Center area will be half of the panel, and locate in the middle of panel.
+				# if the bottom center spot of ball intersect with the center area, we call this center collision
+				# and we decrease the speed of ball
+				lw $t0, panelX
+				lw $t1, panelWidth
+				srl $t1, $t1, 1
+				add $t0, $t0, $t1		# $t0 = the center point
+				lw $t1, ballX
+				lw $t2, ballWidth
+				srl $t2, $t2, 1
+				add $t1, $t1, $t2		# t1 = the bottom center point
+				
+				sub $t0, $t0, $t1
+				abs $t0, $t0			# the distance between two point
+				lw $t1, panelWidth
+				srl $t1, $t1, 1
+				slt $t0, $t0, $t1		# test if the ball hitting the center area
+				beqz $t0, ok_nothing2
+					
+					fentry($a0)
+						lw $a0, ballCollideCenter
+						jal increaseBonusSpeed
+					fexit($a0)
+			
+			ok_nothing2:
+				
 				jal collision_change_ball_movement
 		
 		# test block collision
