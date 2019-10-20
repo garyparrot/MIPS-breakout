@@ -474,9 +474,20 @@
 
 	movingEvent:
 		moveBall:
-			# move ball based on passed time, current speed
+			# move ball every frame
 			# note we better move this ball 1 pixel at a time 
 			# otherwise the ball might cross some object :(
+			
+			# determine if the ball should follow the panel
+			lw $t0, ballFollowPanel
+			beqz $t0, noFollow
+				lw $t0, panelMovement
+				beqz $t0, onMoveBall_exit	# the panel make no move at all
+				sw $t0, ballXMovement
+				li $t0, 1
+				sw $t0, ballMoved
+				j onMoveBall_exit
+			noFollow:
 			
             lw $t0, ballSpeedX          # retrieve motion stuff
             lw $t1, ballSpeedY
@@ -501,6 +512,8 @@
             sub $t3, $t3, $t1
             sw $t2, ballXAccMovement    # store it back
             sw $t3, ballYAccMovement
+
+		onMoveBall_exit:
 
 		jr $ra
 
@@ -983,9 +996,12 @@
 			add $v1, $v0, $v1
 			jr $ra
 		that_is_a_block:
+			lw $t8, panelMovement
 			getXpos($a0, $v0)
 			lw $v1, block_width
 			add $v1, $v0, $v1
+			add $v1, $v1, $t8
+			add $v0, $v0, $t8
 			jr $ra
 			
 	# this function return the top, bottom coordinate of specific object	
@@ -1075,83 +1091,6 @@
 		
 		addi $sp, $sp, -4
 		sw $ra, 0($sp)
-	
-		testPanel:
-			lw $t0, panelMoved
-			beqz $t0, testBlocks	# test if panel moved
-			sw $zero, panelMoved	# reset flag
-			
-			# TODO: determine overflow somewhere else
-			# test if the movement will go beyond the screen
-			lw $t0, panelX
-			lw $t1, panelMovement
-			add $t0, $t0, $t1
-				slt $t0, $t0, $zero
-				beqz $t0, nothing1	 # if left_pixel < 0, execute following instruction
-				lw $t0, panelX
-				sub $t0, $zero, $t0		
-				sw $t0, panelMovement	# adjust movement in order to avoid panel coordinate underflow 0
-				nothing1:
-			lw $t0, panelX
-			lw $t1, panelMovement
-			lw $t2, panelWidth
-			add $t0, $t0, $t1
-			add $t0, $t0, $t2
-			lw $t1, screen_xsize
-				sge $t0, $t0, $t1
-				beqz $t0, nothing2  # if right_pixel >= xsize, execute following instruction
-				panelRight($t0)
-				sub $t0, $t1, $t0
-				sw $t0, panelMovement	# adjust movement in order to avoid panel coordinate overflow xsize
-				nothing2:
-			
-			# remove panel frome the field
-			sw $zero, drawline_firstPixelPayload
-			sw $zero, drawline_middlePixelPayload
-			sw $zero, drawline_lastPixelPayload
-			lw $a0, panelX			# begin of drawing
-			lw $a1, panelWidth
-			add $a1, $a1, $a0		# end of drawing
-			lw $a2, panelY			# yoffset
-			li $a3, 0				# no color
-			jal drawline
-			
-			# draw it with movement
-			lw $t0, collisionCR
-			lw $t1, collisionCR
-			sll $t0, $t0, 6
-			sll $t1, $t1, 6
-			lw $t2, panelObjectId
-			or $t0, $t0, $t2
-			or $t1, $t1, $t2
-			sw $t0, drawline_firstPixelPayload
-			sw $t0, drawline_lastPixelPayload
-			sw $t1, drawline_middlePixelPayload
-			
-			lw $t0, panelMovement
-			add $a0, $a0, $t0		# begin of drawing
-			add $a1, $a1, $t0		# end of drawing
-			lw $a2, panelY
-			lw $a3, panelColor
-			jal drawline
-				
-			# update panel
-			lw $t1, panelX
-			lw $t0, panelMovement
-			add $t1, $t1, $t0
-			sw $t1, panelX
-			
-			# TODO: move this part of code to somewhere else, this should never done in a render.
-			# determine if the ball should follow the panel
-				lw $t0, ballFollowPanel
-				beqz $t0, a
-				lw $t0, panelMovement
-				sw $t0, ballXMovement
-				li $t0, 1
-				sw $t0, ballMoved
-				a:
-			
-			# done
 			
 		testBlocks:
 			li $s0, 0
@@ -1245,6 +1184,49 @@
 			drawBallsEnd:
 		testBall_end:
 			
+		testPanel:
+			lw $t0, panelMoved
+			beqz $t0, testPanel_end	# test if panel moved
+			sw $zero, panelMoved	# reset flag
+			
+			# remove panel frome the field
+			sw $zero, drawline_firstPixelPayload
+			sw $zero, drawline_middlePixelPayload
+			sw $zero, drawline_lastPixelPayload
+			lw $a0, panelX			# begin of drawing
+			lw $a1, panelWidth
+			add $a1, $a1, $a0		# end of drawing
+			lw $a2, panelY			# yoffset
+			li $a3, 0				# no color
+			jal drawline
+			
+			# draw it with movement
+			lw $t0, collisionCR
+			lw $t1, collisionCR
+			sll $t0, $t0, 6
+			sll $t1, $t1, 6
+			lw $t2, panelObjectId
+			or $t0, $t0, $t2
+			or $t1, $t1, $t2
+			sw $t0, drawline_firstPixelPayload
+			sw $t0, drawline_lastPixelPayload
+			sw $t1, drawline_middlePixelPayload
+			
+			lw $t0, panelMovement
+			add $a0, $a0, $t0		# begin of drawing
+			add $a1, $a1, $t0		# end of drawing
+			lw $a2, panelY
+			lw $a3, panelColor
+			jal drawline
+				
+			# update panel
+			lw $t1, panelX
+			lw $t0, panelMovement
+			add $t1, $t1, $t0
+			sw $t1, panelX
+			sw $zero, panelMovement
+		testPanel_end:
+			
 		testWin:
 			lw $t0, uWin
 			beqz $t0, testWin_end
@@ -1328,13 +1310,13 @@
 			lw $t1, keyLeftMovement
 			sw $t1, panelMovement
 			sw $t1, panelMoved
-			j handleInput_exit
+			j testMovment_validity
 		
 		right_move:
 			lw $t1, keyRightMovement
 			sw $t1, panelMovement
 			sw $t1, panelMoved
-			j handleInput_exit
+			j testMovment_validity
 		
 		shoot_ball:
             sw $zero, ballFollowPanel
@@ -1342,7 +1324,33 @@
 			sw $t0, requireSpeedUpdate
 			j handleInput_exit
 		
+		testMovment_validity:
+		
+		# test if the movement will go beyond the screen
+		lw $t0, panelX
+		lw $t1, panelMovement
+		add $t0, $t0, $t1
+			slt $t0, $t0, $zero
+			beqz $t0, nothing1	 # if left_pixel < 0, execute following instruction
+			lw $t0, panelX
+			sub $t0, $zero, $t0		
+			sw $t0, panelMovement	# adjust movement in order to avoid panel coordinate underflow 0
+			nothing1:
+		lw $t0, panelX
+		lw $t1, panelMovement
+		lw $t2, panelWidth
+		add $t0, $t0, $t1
+		add $t0, $t0, $t2
+		lw $t1, screen_xsize
+			sge $t0, $t0, $t1
+			beqz $t0, nothing2  # if right_pixel >= xsize, execute following instruction
+			panelRight($t0)
+			sub $t0, $t1, $t0
+			sw $t0, panelMovement	# adjust movement in order to avoid panel coordinate overflow xsize
+			nothing2:
+		
 		handleInput_exit:
+		
 			fexit($ra)
 			jr $ra	
 		
