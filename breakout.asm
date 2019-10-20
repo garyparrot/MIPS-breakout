@@ -238,7 +238,7 @@
     
     # panel
 	panelX: 	.word 58
-	panelY:		.word 60
+	panelY:		.word 61
 	panelWidth: .word 13
 	panelMoved: .word 1
 	panelMovement:  .word 0
@@ -262,14 +262,15 @@
 	ballFollowPanel:  	.word  1
 	ballFollowOffsetX: 	.word  5
 	ballFollowOffsetY:  .word -5
-    ballInitialSpeedX:  .word  300		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSignX
-    ballInitialSpeedY:  .word  150		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSignY
+    ballInitialSpeedX:  .word  35		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSignX
+    ballInitialSpeedY:  .word  35		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSignY
     ballTouchBottomWall: .word 0
     ballSpeedSignX: .word  1
     ballSpeedSignY: .word -1
     ballBonusSpeed: .word 0
+    ballProgressSpeed: .word 0			# the progress speed for breaking blocks
     
-    ballProgressSpeed: .word 0			# the progress speed for breaking a block
+    ballProgressInc: .word 64			# the increment for breaking a block
     ballPushForce: .word 256			# the bonus speed for panel pushing
     blockCollisionLRSpeed: .word 64		# the bonus speed for LR collision
     ballCollideCenter: .word -128		# the bonus speed for panel center collision
@@ -874,7 +875,7 @@
 				fentry($a0)
 					# increase speed due to pushing
 					lw $a0, ballPushForce
-					jal increaseProgressSpeed
+					jal increaseBonusSpeed
 				fexit($a0)
 				
 				# change ball direction based on the pushing direction
@@ -940,7 +941,7 @@
 			
 			fentry($a0)
 				# increase progress speed because this block been destroyed
-				lw $a0, blockProgressSpeed
+				lw $a0, ballProgressInc
 				jal increaseProgressSpeed
 				# increase bonus speed if this is a LR collision
 				lw $t8, collisionLR
