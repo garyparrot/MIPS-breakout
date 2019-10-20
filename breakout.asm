@@ -255,6 +255,7 @@
 	ballSpeedX: .word 0             # the value add to XMovement every frame
 	ballSpeedY: .word 0             # the value add to YMovement every frame
 	ballColor:  .word 0x00eeeeee	# warning: ball color must be unique to other color on the screen
+	ballPostColor: .word 0x00efefef 
     ballXAccMovement: .word 0          # for every 1024 value, this ball moved one x pixel
     ballYAccMovement: .word 0          # for every 1024 value, this ball moved one y pixel
 	ballXMovement: .word 0
@@ -289,6 +290,8 @@
     drawline_firstPixelPayload: 	.word 0
     drawline_lastPixelPayload:   	.word 0
     drawline_middlePixelPayload:	.word 0
+    drawline_targetColor:			.word 0
+    drawline_anyColor:				.word 1
     
     requireSpeedUpdate: .word 0
 	
@@ -1139,20 +1142,24 @@
 			sw $zero, drawline_firstPixelPayload
 			sw $zero, drawline_lastPixelPayload
 			sw $zero, drawline_middlePixelPayload
+			# draw color on condition
+			sw $zero, drawline_anyColor
+			lw $t0, ballColor
+			sw $t0, drawline_targetColor
 			
-			clearBalls:
-				beq $s4, $s1, clearBallsEnd
+			fillBallWithPostColor:
+				beq $s4, $s1, fillBallWithPostColorEnd
 				
 				add $a0, $s0, $zero	  # begin of x
 				add $a1, $s0, $s2	  # end of x
 				add $a2, $s1, $zero	  # y
-				add $a3, $zero, $zero # clear color
+				lw  $a3, ballPostColor # post color
 					
 				jal drawline
 					
 				addi $s1, $s1, 1
-				j clearBalls
-			clearBallsEnd:
+				j fillBallWithPostColor
+			fillBallWithPostColorEnd:
 			
 			# change the position of that fucking shit			
 			lw $s0, ballX
@@ -1161,13 +1168,19 @@
 			lw $s3, ballHeight
 			lw $t0, ballXMovement
 			lw $t1, ballYMovement
-			add $s0, $s0, $t0
-			add $s1, $s1, $t1
+			add $s0, $s0, $t0		# $s0 = the new position for ball X
+			add $s1, $s1, $t1		# $s1 = the new position for ball Y
+			lw $s5, ballX			# We store the original position for later use
+			lw $s6, ballY			# We store the original position for later use
 			sw $s0, ballX
 			sw $s1, ballY
 			sw $zero ballMoved
 			
-			# draw it like it hot
+			# draw color on any condition
+			li $t0, 1
+			sw $t0, drawline_anyColor
+			
+			# draw it like it's hot
 			add $s4, $s1, $s3
 			drawBalls:
 				beq $s4, $s1, drawBallsEnd
@@ -1182,6 +1195,32 @@
 				addi $s1, $s1, 1
 				j drawBalls
 			drawBallsEnd:
+			
+			# only draw color on post ball color
+			sw $zero, drawline_anyColor
+			lw $t0, ballPostColor
+			sw $t0, drawline_targetColor
+			
+			# remove old ball color from field
+			add $s4, $s6, $s3
+			removeOldBall:
+				beq $s4, $s6, removeOldBallEnd
+				
+				add $a0, $s5, $zero
+				add $a1, $s5, $s2
+				add $a2, $s6, $zero
+				li  $a3, 0
+				
+				jal drawline
+				
+				addi $s6, $s6, 1
+				j removeOldBall
+				
+			removeOldBallEnd:
+			
+			li $t0, 1
+			sw $t0, drawline_anyColor
+			
 		testBall_end:
 			
 		testPanel:
@@ -1439,7 +1478,11 @@
 
 	# This method draw a line between [$a0, $a1) with color $a3 on y $a2
 	drawline:
-		fentry($a0,$a1,$a2)
+		fentry($a0,$a1,$a2,$s0)
+		
+		lw $t2, drawline_anyColor
+		lw $s0, drawline_targetColor
+		andi $s0, $s0, 0xffffff
 		
 		# loading extra argument from global :p
 		# this is a hack, Don't do it at home
@@ -1460,8 +1503,14 @@
 		add $a1, $a1, $a2
 		
 		# This code is a serious joke, just like the assignment itself :p
-		or $t1, $a3, $t5				# compose payload with color code
-		sw $t1, 0x10040000($a0)			# store first payload
+		bnez $t2, justDraw1
+		lw $t4, 0x10040000($a0)			# get color
+		andi $t4, $t4, 0xffffff			# strip alpha channel
+		bne $t4, $s0, DONOT1 			# test if the color match, if so don't paint it
+			justDraw1:
+			or $t1, $a3, $t5				# compose payload with color code
+			sw $t1, 0x10040000($a0)			# store first payload
+		DONOT1:
 		addi $a0, $a0, 4
 		
 		or $t1, $a3, $t6				# compose payload with color code
@@ -1471,16 +1520,28 @@
 			slt $t0,$a0, $a1			# test if $a0 < $a1
 			beqz $t0 end_of_drawline	
 			
-			sw $t1, 0x10040000($a0)		# paint color on bitmap
+			bnez $t2, justDraw2
+			lw $t4, 0x10040000($a0)			# get color
+			andi $t4, $t4, 0xffffff			# strip alpha channel
+			bne $t4, $s0, DONOT2 			# test if the color match, if so don't paint it
+				justDraw2:	
+				sw $t1, 0x10040000($a0)		# paint color on bitmap
+			DONOT2:
 			addi $a0, $a0, 4			# move to next pixel
 			
 			j keep_drawing
 		end_of_drawline:
 		
-		or $t1, $a3, $t7				# compose payload with color code
-		sw $t1, 0x10040000($a0)			# store it back
+		bnez $t2, justDraw3
+		lw $t4, 0x10040000($a0)			# get color
+		andi $t4, $t4, 0xffffff			# strip alpha channel
+		bne $t4, $s0, DONOT3			# test if the color match, if so don't paint it
+			justDraw3:
+			or $t1, $a3, $t7				# compose payload with color code
+			sw $t1, 0x10040000($a0)			# store it back
+		DONOT3:
 		
-		fexit($a0,$a1,$a2)
+		fexit($a0,$a1,$a2,$s0)
 		jr $ra
 
 # }}}
