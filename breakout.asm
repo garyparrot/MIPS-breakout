@@ -238,7 +238,7 @@
     
     # panel
 	panelX: 	.word 58
-	panelY:		.word 60
+	panelY:		.word 61
 	panelWidth: .word 13
 	panelMoved: .word 1
 	panelMovement:  .word 0
@@ -255,6 +255,7 @@
 	ballSpeedX: .word 0             # the value add to XMovement every frame
 	ballSpeedY: .word 0             # the value add to YMovement every frame
 	ballColor:  .word 0x00eeeeee	# warning: ball color must be unique to other color on the screen
+	ballPostColor: .word 0x00efefef 
     ballXAccMovement: .word 0          # for every 1024 value, this ball moved one x pixel
     ballYAccMovement: .word 0          # for every 1024 value, this ball moved one y pixel
 	ballXMovement: .word 0
@@ -262,14 +263,15 @@
 	ballFollowPanel:  	.word  1
 	ballFollowOffsetX: 	.word  5
 	ballFollowOffsetY:  .word -5
-    ballInitialSpeedX:  .word  300		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSignX
-    ballInitialSpeedY:  .word  150		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSignY
+    ballInitialSpeedX:  .word  35		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSignX
+    ballInitialSpeedY:  .word  35		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSignY
     ballTouchBottomWall: .word 0
     ballSpeedSignX: .word  1
     ballSpeedSignY: .word -1
     ballBonusSpeed: .word 0
+    ballProgressSpeed: .word 0			# the progress speed for breaking blocks
     
-    ballProgressSpeed: .word 0			# the progress speed for breaking a block
+    ballProgressInc: .word 64			# the increment for breaking a block
     ballPushForce: .word 256			# the bonus speed for panel pushing
     blockCollisionLRSpeed: .word 64		# the bonus speed for LR collision
     ballCollideCenter: .word -128		# the bonus speed for panel center collision
@@ -288,6 +290,8 @@
     drawline_firstPixelPayload: 	.word 0
     drawline_lastPixelPayload:   	.word 0
     drawline_middlePixelPayload:	.word 0
+    drawline_targetColor:			.word 0
+    drawline_anyColor:				.word 1
     
     requireSpeedUpdate: .word 0
 	
@@ -473,9 +477,20 @@
 
 	movingEvent:
 		moveBall:
-			# move ball based on passed time, current speed
+			# move ball every frame
 			# note we better move this ball 1 pixel at a time 
 			# otherwise the ball might cross some object :(
+			
+			# determine if the ball should follow the panel
+			lw $t0, ballFollowPanel
+			beqz $t0, noFollow
+				lw $t0, panelMovement
+				beqz $t0, onMoveBall_exit	# the panel make no move at all
+				sw $t0, ballXMovement
+				li $t0, 1
+				sw $t0, ballMoved
+				j onMoveBall_exit
+			noFollow:
 			
             lw $t0, ballSpeedX          # retrieve motion stuff
             lw $t1, ballSpeedY
@@ -500,6 +515,8 @@
             sub $t3, $t3, $t1
             sw $t2, ballXAccMovement    # store it back
             sw $t3, ballYAccMovement
+
+		onMoveBall_exit:
 
 		jr $ra
 
@@ -874,7 +891,7 @@
 				fentry($a0)
 					# increase speed due to pushing
 					lw $a0, ballPushForce
-					jal increaseProgressSpeed
+					jal increaseBonusSpeed
 				fexit($a0)
 				
 				# change ball direction based on the pushing direction
@@ -940,7 +957,7 @@
 			
 			fentry($a0)
 				# increase progress speed because this block been destroyed
-				lw $a0, blockProgressSpeed
+				lw $a0, ballProgressInc
 				jal increaseProgressSpeed
 				# increase bonus speed if this is a LR collision
 				lw $t8, collisionLR
@@ -982,9 +999,12 @@
 			add $v1, $v0, $v1
 			jr $ra
 		that_is_a_block:
+			lw $t8, panelMovement
 			getXpos($a0, $v0)
 			lw $v1, block_width
 			add $v1, $v0, $v1
+			add $v1, $v1, $t8
+			add $v0, $v0, $t8
 			jr $ra
 			
 	# this function return the top, bottom coordinate of specific object	
@@ -1074,83 +1094,6 @@
 		
 		addi $sp, $sp, -4
 		sw $ra, 0($sp)
-	
-		testPanel:
-			lw $t0, panelMoved
-			beqz $t0, testBlocks	# test if panel moved
-			sw $zero, panelMoved	# reset flag
-			
-			# TODO: determine overflow somewhere else
-			# test if the movement will go beyond the screen
-			lw $t0, panelX
-			lw $t1, panelMovement
-			add $t0, $t0, $t1
-				slt $t0, $t0, $zero
-				beqz $t0, nothing1	 # if left_pixel < 0, execute following instruction
-				lw $t0, panelX
-				sub $t0, $zero, $t0		
-				sw $t0, panelMovement	# adjust movement in order to avoid panel coordinate underflow 0
-				nothing1:
-			lw $t0, panelX
-			lw $t1, panelMovement
-			lw $t2, panelWidth
-			add $t0, $t0, $t1
-			add $t0, $t0, $t2
-			lw $t1, screen_xsize
-				sge $t0, $t0, $t1
-				beqz $t0, nothing2  # if right_pixel >= xsize, execute following instruction
-				panelRight($t0)
-				sub $t0, $t1, $t0
-				sw $t0, panelMovement	# adjust movement in order to avoid panel coordinate overflow xsize
-				nothing2:
-			
-			# remove panel frome the field
-			sw $zero, drawline_firstPixelPayload
-			sw $zero, drawline_middlePixelPayload
-			sw $zero, drawline_lastPixelPayload
-			lw $a0, panelX			# begin of drawing
-			lw $a1, panelWidth
-			add $a1, $a1, $a0		# end of drawing
-			lw $a2, panelY			# yoffset
-			li $a3, 0				# no color
-			jal drawline
-			
-			# draw it with movement
-			lw $t0, collisionCR
-			lw $t1, collisionCR
-			sll $t0, $t0, 6
-			sll $t1, $t1, 6
-			lw $t2, panelObjectId
-			or $t0, $t0, $t2
-			or $t1, $t1, $t2
-			sw $t0, drawline_firstPixelPayload
-			sw $t0, drawline_lastPixelPayload
-			sw $t1, drawline_middlePixelPayload
-			
-			lw $t0, panelMovement
-			add $a0, $a0, $t0		# begin of drawing
-			add $a1, $a1, $t0		# end of drawing
-			lw $a2, panelY
-			lw $a3, panelColor
-			jal drawline
-				
-			# update panel
-			lw $t1, panelX
-			lw $t0, panelMovement
-			add $t1, $t1, $t0
-			sw $t1, panelX
-			
-			# TODO: move this part of code to somewhere else, this should never done in a render.
-			# determine if the ball should follow the panel
-				lw $t0, ballFollowPanel
-				beqz $t0, a
-				lw $t0, panelMovement
-				sw $t0, ballXMovement
-				li $t0, 1
-				sw $t0, ballMoved
-				a:
-			
-			# done
 			
 		testBlocks:
 			li $s0, 0
@@ -1199,20 +1142,24 @@
 			sw $zero, drawline_firstPixelPayload
 			sw $zero, drawline_lastPixelPayload
 			sw $zero, drawline_middlePixelPayload
+			# draw color on condition
+			sw $zero, drawline_anyColor
+			lw $t0, ballColor
+			sw $t0, drawline_targetColor
 			
-			clearBalls:
-				beq $s4, $s1, clearBallsEnd
+			fillBallWithPostColor:
+				beq $s4, $s1, fillBallWithPostColorEnd
 				
 				add $a0, $s0, $zero	  # begin of x
 				add $a1, $s0, $s2	  # end of x
 				add $a2, $s1, $zero	  # y
-				add $a3, $zero, $zero # clear color
+				lw  $a3, ballPostColor # post color
 					
 				jal drawline
 					
 				addi $s1, $s1, 1
-				j clearBalls
-			clearBallsEnd:
+				j fillBallWithPostColor
+			fillBallWithPostColorEnd:
 			
 			# change the position of that fucking shit			
 			lw $s0, ballX
@@ -1221,13 +1168,19 @@
 			lw $s3, ballHeight
 			lw $t0, ballXMovement
 			lw $t1, ballYMovement
-			add $s0, $s0, $t0
-			add $s1, $s1, $t1
+			add $s0, $s0, $t0		# $s0 = the new position for ball X
+			add $s1, $s1, $t1		# $s1 = the new position for ball Y
+			lw $s5, ballX			# We store the original position for later use
+			lw $s6, ballY			# We store the original position for later use
 			sw $s0, ballX
 			sw $s1, ballY
 			sw $zero ballMoved
 			
-			# draw it like it hot
+			# draw color on any condition
+			li $t0, 1
+			sw $t0, drawline_anyColor
+			
+			# draw it like it's hot
 			add $s4, $s1, $s3
 			drawBalls:
 				beq $s4, $s1, drawBallsEnd
@@ -1242,7 +1195,76 @@
 				addi $s1, $s1, 1
 				j drawBalls
 			drawBallsEnd:
+			
+			# only draw color on post ball color
+			sw $zero, drawline_anyColor
+			lw $t0, ballPostColor
+			sw $t0, drawline_targetColor
+			
+			# remove old ball color from field
+			add $s4, $s6, $s3
+			removeOldBall:
+				beq $s4, $s6, removeOldBallEnd
+				
+				add $a0, $s5, $zero
+				add $a1, $s5, $s2
+				add $a2, $s6, $zero
+				li  $a3, 0
+				
+				jal drawline
+				
+				addi $s6, $s6, 1
+				j removeOldBall
+				
+			removeOldBallEnd:
+			
+			li $t0, 1
+			sw $t0, drawline_anyColor
+			
 		testBall_end:
+			
+		testPanel:
+			lw $t0, panelMoved
+			beqz $t0, testPanel_end	# test if panel moved
+			sw $zero, panelMoved	# reset flag
+			
+			# remove panel frome the field
+			sw $zero, drawline_firstPixelPayload
+			sw $zero, drawline_middlePixelPayload
+			sw $zero, drawline_lastPixelPayload
+			lw $a0, panelX			# begin of drawing
+			lw $a1, panelWidth
+			add $a1, $a1, $a0		# end of drawing
+			lw $a2, panelY			# yoffset
+			li $a3, 0				# no color
+			jal drawline
+			
+			# draw it with movement
+			lw $t0, collisionCR
+			lw $t1, collisionCR
+			sll $t0, $t0, 6
+			sll $t1, $t1, 6
+			lw $t2, panelObjectId
+			or $t0, $t0, $t2
+			or $t1, $t1, $t2
+			sw $t0, drawline_firstPixelPayload
+			sw $t0, drawline_lastPixelPayload
+			sw $t1, drawline_middlePixelPayload
+			
+			lw $t0, panelMovement
+			add $a0, $a0, $t0		# begin of drawing
+			add $a1, $a1, $t0		# end of drawing
+			lw $a2, panelY
+			lw $a3, panelColor
+			jal drawline
+				
+			# update panel
+			lw $t1, panelX
+			lw $t0, panelMovement
+			add $t1, $t1, $t0
+			sw $t1, panelX
+			sw $zero, panelMovement
+		testPanel_end:
 			
 		testWin:
 			lw $t0, uWin
@@ -1327,13 +1349,13 @@
 			lw $t1, keyLeftMovement
 			sw $t1, panelMovement
 			sw $t1, panelMoved
-			j handleInput_exit
+			j testMovment_validity
 		
 		right_move:
 			lw $t1, keyRightMovement
 			sw $t1, panelMovement
 			sw $t1, panelMoved
-			j handleInput_exit
+			j testMovment_validity
 		
 		shoot_ball:
             sw $zero, ballFollowPanel
@@ -1341,7 +1363,33 @@
 			sw $t0, requireSpeedUpdate
 			j handleInput_exit
 		
+		testMovment_validity:
+		
+		# test if the movement will go beyond the screen
+		lw $t0, panelX
+		lw $t1, panelMovement
+		add $t0, $t0, $t1
+			slt $t0, $t0, $zero
+			beqz $t0, nothing1	 # if left_pixel < 0, execute following instruction
+			lw $t0, panelX
+			sub $t0, $zero, $t0		
+			sw $t0, panelMovement	# adjust movement in order to avoid panel coordinate underflow 0
+			nothing1:
+		lw $t0, panelX
+		lw $t1, panelMovement
+		lw $t2, panelWidth
+		add $t0, $t0, $t1
+		add $t0, $t0, $t2
+		lw $t1, screen_xsize
+			sge $t0, $t0, $t1
+			beqz $t0, nothing2  # if right_pixel >= xsize, execute following instruction
+			panelRight($t0)
+			sub $t0, $t1, $t0
+			sw $t0, panelMovement	# adjust movement in order to avoid panel coordinate overflow xsize
+			nothing2:
+		
 		handleInput_exit:
+		
 			fexit($ra)
 			jr $ra	
 		
@@ -1430,7 +1478,11 @@
 
 	# This method draw a line between [$a0, $a1) with color $a3 on y $a2
 	drawline:
-		fentry($a0,$a1,$a2)
+		fentry($a0,$a1,$a2,$s0)
+		
+		lw $t2, drawline_anyColor
+		lw $s0, drawline_targetColor
+		andi $s0, $s0, 0xffffff
 		
 		# loading extra argument from global :p
 		# this is a hack, Don't do it at home
@@ -1451,8 +1503,14 @@
 		add $a1, $a1, $a2
 		
 		# This code is a serious joke, just like the assignment itself :p
-		or $t1, $a3, $t5				# compose payload with color code
-		sw $t1, 0x10040000($a0)			# store first payload
+		bnez $t2, justDraw1
+		lw $t4, 0x10040000($a0)			# get color
+		andi $t4, $t4, 0xffffff			# strip alpha channel
+		bne $t4, $s0, DONOT1 			# test if the color match, if so don't paint it
+			justDraw1:
+			or $t1, $a3, $t5				# compose payload with color code
+			sw $t1, 0x10040000($a0)			# store first payload
+		DONOT1:
 		addi $a0, $a0, 4
 		
 		or $t1, $a3, $t6				# compose payload with color code
@@ -1462,16 +1520,28 @@
 			slt $t0,$a0, $a1			# test if $a0 < $a1
 			beqz $t0 end_of_drawline	
 			
-			sw $t1, 0x10040000($a0)		# paint color on bitmap
+			bnez $t2, justDraw2
+			lw $t4, 0x10040000($a0)			# get color
+			andi $t4, $t4, 0xffffff			# strip alpha channel
+			bne $t4, $s0, DONOT2 			# test if the color match, if so don't paint it
+				justDraw2:	
+				sw $t1, 0x10040000($a0)		# paint color on bitmap
+			DONOT2:
 			addi $a0, $a0, 4			# move to next pixel
 			
 			j keep_drawing
 		end_of_drawline:
 		
-		or $t1, $a3, $t7				# compose payload with color code
-		sw $t1, 0x10040000($a0)			# store it back
+		bnez $t2, justDraw3
+		lw $t4, 0x10040000($a0)			# get color
+		andi $t4, $t4, 0xffffff			# strip alpha channel
+		bne $t4, $s0, DONOT3			# test if the color match, if so don't paint it
+			justDraw3:
+			or $t1, $a3, $t7				# compose payload with color code
+			sw $t1, 0x10040000($a0)			# store it back
+		DONOT3:
 		
-		fexit($a0,$a1,$a2)
+		fexit($a0,$a1,$a2,$s0)
 		jr $ra
 
 # }}}
