@@ -1,4 +1,12 @@
 # vim:set syntax=mips:
+
+# TODO: Adjust the game argument, make them reasonable.
+# TODO: Ball got different angle when collide with panel.
+# TODO: Change the position of special blocks, and add more
+# TODO: Consider add more blocks
+# TODO: Consider make the game restartable
+# TODO: Consider add a puase functionality
+
 # Macros {{{
 
 .macro allocBitmap(%xsize, %ysize)
