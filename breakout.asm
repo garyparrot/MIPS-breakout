@@ -1,8 +1,7 @@
 # vim:set syntax=mips:
 
 # TODO: Consider make the game restartable
-# TODO: Ball got different angle when collide with panel.
-# TODO: Bugfix, when ball collide with two block, the direction change get cancel out
+# TODO: Ball got different angle when collide with panel.o
 # TODO:　Bugfix, find the reason why the ball didn't follow the direction of pusing
 # TODO: Refactor code, remove useless property and clean up dirty word
 
@@ -747,6 +746,8 @@
             	subi $t0, $t0, 1
             	bnez $t0, keep_do_it_LOL
             
+            li $a2, 1		# allow movement change at the first collision
+            
             loop_rows:
                 beqz $s3, loop_rows_end         # no more height for scanning
 	            lw $t8, screen_xbits
@@ -771,6 +772,8 @@
 						bnez $t8, continue_scanning666
 							# call it 
 							jal collision_event
+							
+							li $a2, 0		# disable movement change for later collision event
 							
 							# set collided tag 
 							sll $t8, $a0, 2
@@ -809,6 +812,9 @@
 	# Once collision happened, this subroutin get called
 	# $a0: the id of object who collide with ball
 	# $a1: the direction code 
+	# $a2: shall this collision event trigger movement chages
+	#	   in order to prevent bug caused by collide with multiple instance
+	#	   movement change should occur once a frame
 	collision_event:
 		fentry($ra,$s0,$s1,$s2)
 		fentry($s3)
@@ -958,6 +964,7 @@
 			
 			ok_nothing2:
 				
+				beqz $a2, next_collision_2
 				jal collision_change_ball_movement
 		
 		# test block collision
@@ -990,6 +997,7 @@
 			
 			setStatusDestoryed($a0)
 			
+			beqz $a2, next_collision_2
 			jal collision_change_ball_movement
 			
 		next_collision_2:
