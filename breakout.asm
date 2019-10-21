@@ -1,9 +1,10 @@
 # vim:set syntax=mips:
 
-# TODO: Adjust the game argument, make them reasonable.
-# TODO: Ball got different angle when collide with panel.
 # TODO: Consider make the game restartable
-# TODO: Consider add a puase functionality
+# TODO: Ball got different angle when collide with panel.
+# TODO: Bugfix, when ball collide with two block, the direction change get cancel out
+# TODO:　Bugfix, find the reason why the ball didn't follow the direction of pusing
+# TODO: Refactor code, remove useless property and clean up dirty word
 
 # Macros {{{
 
@@ -281,12 +282,12 @@
     ballBonusSpeed: .word 0
     ballProgressSpeed: .word 0			# the progress speed for breaking blocks
     
-    ballProgressInc: .word 64			# the increment for breaking a block
-    ballPushForce: .word 256			# the bonus speed for panel pushing
-    blockCollisionLRSpeed: .word 64		# the bonus speed for LR collision
+    ballProgressInc: .word 40			# the increment for breaking a block
+    ballPushForce: .word 200			# the bonus speed for panel pushing
+    blockCollisionLRSpeed: .word 32		# the bonus speed for LR collision
     ballCollideCenter: .word -128		# the bonus speed for panel center collision
     
-    bonusSpeedMaximum: .word  1600
+    bonusSpeedMaximum: .word  1024
     bonusSpeedMinimum: .word -512
     
     # collision code
