@@ -1,4 +1,9 @@
 # vim:set syntax=mips:
+
+# TODO: Consider make the game restartable
+# TODO: Ball got different angle when collide with panel.
+# TODO: Refactor code, remove useless property and clean up dirty word
+
 # Macros {{{
 
 .macro allocBitmap(%xsize, %ysize)
@@ -203,48 +208,62 @@
 .data
 	preg: .word 0,0,0,0,0,0,0,0,0
 	jreg: .word 0,0,0,0,0,0,0,0,0
+	
+	# display related
 	screen_xsize: .word 128
 	screen_ysize: .word 64
 	screen_xbits: .word 7
-	block_width:  .word 8
-	block_height: .word 5
-	totBlocks:    .word 45
+	
+	# Game status 
 	gaming: 	  .word 1 		# is the game running? 
 	uWin:		  .word 0
 	uLose: 		  .word 0
 	gameCheating: .word 1		# cheating mode
-	frame:		  .word 0		# current frame index, that mean this game can run continusely about 24 days 
-	keyLeftMovement:  .word -6	
-	keyRightMovement: .word  6
-	
+    blockCollided: .space 256
+    requireSpeedUpdate: .word 0
+
 	# Blocks
-	# xpos, ypos, color, destroyed
+	totBlocks:    		.word 60
+    blockRemaining:	    .word 60
 	blocks: .word  
-          4,  0,16711680, 0, 20,  0,16711680, 0, 36,  0,16711680, 0, 52,  0,16711680, 0, 68,  0,16711680, 0, 84,  0,16711680, 0,100,  0,16711680, 0,116,  0,16711680, 0,
-         12,  5,   65280, 0, 28,  5,   65280, 0, 44,  5,   65280, 0, 60,  5,   65280, 0, 76,  5,   65280, 0, 92,  5,   65280, 0,108,  5,   65280, 0,
-          4, 10,     255, 0, 20, 10,     255, 0, 36, 10,     255, 0, 52, 10,     255, 0, 68, 10,     255, 0, 84, 10,     255, 0,100, 10,     255, 0,116, 10,     255, 0,
-         12, 15,16776960, 0, 28, 15,16776960, 0, 44, 15,16776960, 0, 60, 15,16776960, 0, 76, 15,16776960, 0, 92, 15,16776960, 0,108, 15,16776960, 0,
-          4, 20,16711935, 0, 20, 20,16711935, 0, 36, 20,16711935, 0, 52, 20,16711935, 0, 68, 20,16711935, 0, 84, 20,16711935, 0,100, 20,16711935, 0,116, 20,16711935, 0,
-         12, 25,   65535, 0, 28, 25,   65535, 0, 44, 25,   65535, 0, 60, 25,   65535, 0, 76, 25,   65535, 0, 92, 25,0xe95cff, 2,108, 25,   65535, 0
-    blockCollided: .word 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-					     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-					     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-					     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+      4,  0,16746923, 0, 14,  0,16746955, 0, 24,  0,15960575, 0, 34,  0,11700735, 0, 44,  0, 9019391, 0, 54,  0, 9036031, 0, 64,  0, 9043934, 0, 74,  0, 9043869, 0, 84,  0,11861897, 0, 94,  0,16121737, 0,104,  0,16763273, 0,114,  0,16746889, 0,
+      4,  7,16746923, 0, 14,  7,16746955, 0, 24,  7,15960575, 0, 34,  7,11700735, 0, 44,  7, 9019391, 0, 54,  7, 9036031, 0, 64,  7, 9043934, 0, 74,  7, 9043869, 0, 84,  7,11861897, 0, 94,  7,16121737, 0,104,  7,16763273, 0,114,  7,16746889, 0,
+      4, 14,16746923, 0, 14, 14,16746955, 0, 24, 14,15960575, 0, 34, 14,11700735, 0, 44, 14, 9019391, 0, 54, 14, 9036031, 0, 64, 14, 9043934, 0, 74, 14, 9043869, 0, 84, 14,11861897, 0, 94, 14,16121737, 0,104, 14,16763273, 0,114, 14,16746889, 0,
+      4, 21,16746923, 0, 14, 21,16746955, 0, 24, 21,15960575, 0, 34, 21,11700735, 0, 44, 21, 9019391, 0, 54, 21, 9036031, 0, 64, 21, 9043934, 0, 74, 21, 9043869, 0, 84, 21,11861897, 0, 94, 21,16121737, 0,104, 21,16763273, 0,114, 21,16746889, 0,
+      4, 28,16746923, 0, 14, 28,16746955, 0, 24, 28,15960575, 0, 34, 28,11700735, 0, 44, 28, 9019391, 0, 54, 28, 9036031, 0, 64, 28, 9043934, 0, 74, 28, 9043869, 0, 84, 28,11861897, 0, 94, 28,16121737, 0,104, 28,16763273, 0,114, 28,16746889, 0,
+	block_width:  .word 10
+	block_height: .word 7
+
+	# Game Properties
+    ballProgressInc: 		.word  40			# the increment for breaking a block
+    ballPushForce: 			.word  200			# the bonus speed for panel pushing
+    blockCollisionLRSpeed:  .word  32			# the bonus speed for LR collision
+    ballCollideCenter: 		.word -128			# the bonus speed for panel center collision
+	keyLeftMovement:  		.word -6			# left movement distance of panel
+	keyRightMovement: 		.word  6			# right movement distance of panel
+    bonusSpeedMaximum: 		.word  1024			# the maximum value of bonus speed
+    bonusSpeedMinimum: 		.word -512			# the minimum value of bonus speed
+
+    # Game constant
     blockStatusDestroyed:   .word 0x1
     blockStatusSpecial:		.word 0x2
-    blockRemaining:		    .word 45
-    blockProgressSpeed:	    .word 30
-  
+    # collision code
+    collisionCR: .word 3
+    collisionLR: .word 2
+    collisionTB: .word 1
+    collisionNP: .word 0
+    collisionPushByPanel: .word 4
     
     # panel
 	panelX: 	.word 58
-	panelY:		.word 61
+	panelY:		.word 59
 	panelWidth: .word 13
 	panelMoved: .word 1
 	panelMovement:  .word 0
 	panelColor: .word 0x00ffffff
 	panelObjectId: .word 63
 	panelStretch: .word 0
+    panelLastMoveDir: .word 0			# last direction
 
 	# ball
 	ballX:		.word 63
@@ -271,21 +290,6 @@
     ballBonusSpeed: .word 0
     ballProgressSpeed: .word 0			# the progress speed for breaking blocks
     
-    ballProgressInc: .word 64			# the increment for breaking a block
-    ballPushForce: .word 256			# the bonus speed for panel pushing
-    blockCollisionLRSpeed: .word 64		# the bonus speed for LR collision
-    ballCollideCenter: .word -128		# the bonus speed for panel center collision
-    
-    bonusSpeedMaximum: .word  1600
-    bonusSpeedMinimum: .word -512
-    
-    # collision code
-    collisionCR: .word 3
-    collisionLR: .word 2
-    collisionTB: .word 1
-    collisionNP: .word 0
-    collisionPushByPanel: .word 4
-    
     # drawline
     drawline_firstPixelPayload: 	.word 0
     drawline_lastPixelPayload:   	.word 0
@@ -293,12 +297,11 @@
     drawline_targetColor:			.word 0
     drawline_anyColor:				.word 1
     
-    requireSpeedUpdate: .word 0
-	
 	# last frame system time
 	lastms: 	.word 0
 	passedms:   .word 0
 	
+	# pixel art
 	win_bitmap: .word 
             56, 30, 0x422400, 56, 31, 0x643a00, 56, 32, 0x4f2f00, 57, 28, 0x784700, 57, 29, 0x070502, 57, 30, 0x302617, 57, 31, 0x452f03, 57, 32, 0xdbac1a, 57, 33, 0xe1a312, 57, 34, 0x935a01, 
             58, 27, 0x895401, 58, 28, 0xf3c521, 58, 29, 0x2f2e28, 58, 30, 0x2c2c2b, 58, 32, 0x695b12, 58, 33, 0xfbce29, 58, 34, 0xf6ac1b, 58, 35, 0xab6903, 59, 26, 0x372000, 59, 27, 0xecb518, 
@@ -361,7 +364,6 @@
 			
 	# Game loop
 	# For now on, $s7 store the frame number
-	lw $s7, frame
 	GameLoop:
 		
 		# next frame
@@ -455,6 +457,8 @@
 		
 		sw $v0, passedms		# store the millisecond been passed since last waiting.
 		
+		sw $a0, lastms
+		
 		lw $a0, jreg+0
 		lw $a1, jreg+4
 		lw $ra, jreg+8
@@ -540,12 +544,14 @@
 		
 		setX:
 			beqz $a0, setY
-			lw $a0, ballSpeedSignX
+			sw $a0, ballSpeedSignX
 		setY:
 			beqz $a1, okkkk
-			lw $a1, ballSpeedSignY
-			
+			sw $a1, ballSpeedSignY
+		
 		okkkk:
+			li $t0, 1
+			sw $t0, requireSpeedUpdate
 			jr $ra
 		
 	
@@ -736,6 +742,8 @@
             	subi $t0, $t0, 1
             	bnez $t0, keep_do_it_LOL
             
+            li $a2, 1		# allow movement change at the first collision
+            
             loop_rows:
                 beqz $s3, loop_rows_end         # no more height for scanning
 	            lw $t8, screen_xbits
@@ -777,6 +785,9 @@
 							li $a0, '\n'
 							li $v0, 11
 							syscall
+							
+							li $a2, 0		# disable movement change for later collision event
+							
 						
 						continue_scanning666:
                         subi $s2, $s2, 1
@@ -798,6 +809,9 @@
 	# Once collision happened, this subroutin get called
 	# $a0: the id of object who collide with ball
 	# $a1: the direction code 
+	# $a2: shall this collision event trigger movement chages
+	#	   in order to prevent bug caused by collide with multiple instance
+	#	   movement change should occur once a frame
 	collision_event:
 		fentry($ra,$s0,$s1,$s2)
 		fentry($s3)
@@ -869,13 +883,7 @@
 				j finally_done
 			
 			finally_done:
-		
-			dprintc('c')
-			dprintc(':')
-			dprintr($a1)
-			dprintc('\n')
 			
-		
 		# test panel collision
 		next_collision_0:
 			lw $t0, panelObjectId
@@ -884,7 +892,8 @@
 			lw $t1, collisionPushByPanel
 			bne $t1, $a1, ok_nothing
 			pushByPanel:
-				li $t0, -3
+				lw $t0, ballHeight
+				sub $t0, $zero, $t0
 				sw $t0, ballYMovement
 				sw $t0, ballMoved
 
@@ -896,25 +905,14 @@
 				
 				# change ball direction based on the pushing direction
 				fentry($a0, $a1)
-					lw $a0, panelMovement
-					sge $a0, $a0, $zero
-					bnez $a0, postive		# if movement >  0
-					slt $a0, $a0, $zero
-					bnez $a0, negative		# if movement <  0
-					li $a0, 0				# if movement == 0
-					j ok6666
-						negative:
-							li $a0, -1
-						postive:
-							li $a0,  1
-						ok6666:
+					lw $a0, panelLastMoveDir
 					li $a1, -1
 					
+					beqz $a2, ok_nothing
 					jal setBallDirection
 				fexit($a0,$a1)
 				
-				dprintc('P')
-				dprintc('\n')
+
 				
 				j next_collision_1
 						
@@ -947,6 +945,7 @@
 			
 			ok_nothing2:
 				
+				beqz $a2, next_collision_1
 				jal collision_change_ball_movement
 		
 		# test block collision
@@ -979,6 +978,7 @@
 			
 			setStatusDestoryed($a0)
 			
+			beqz $a2, next_collision_2
 			jal collision_change_ball_movement
 			
 		next_collision_2:
@@ -1042,23 +1042,17 @@
 			sw $zero, ballYMovement
 			jal ballReverseXSpeed
 			jal ballReverseYSpeed
-			dprintc('R')
-			dprintc('\n')
 			j collisionMovement_end
 		
 		collisionLR_movement:
 			sw $zero, ballXMovement
 			sw $zero, ballYMovement
 			jal ballReverseXSpeed
-			dprintc('L')
-			dprintc('\n')
 			j collisionMovement_end
 		collisionTB_movement:
 			sw $zero, ballXMovement
 			sw $zero, ballYMovement
 			jal ballReverseYSpeed
-			dprintc('T')
-			dprintc('\n')
 			
 		collisionMovement_end:
 		fexit($ra)
@@ -1174,6 +1168,8 @@
 			lw $s6, ballY			# We store the original position for later use
 			sw $s0, ballX
 			sw $s1, ballY
+			sw $zero, ballXMovement
+			sw $zero, ballYMovement
 			sw $zero ballMoved
 			
 			# draw color on any condition
@@ -1346,12 +1342,16 @@
 		j handleInput_exit
 		
 		left_move:
+			li $t1, -1
+			sw $t1, panelLastMoveDir
 			lw $t1, keyLeftMovement
 			sw $t1, panelMovement
 			sw $t1, panelMoved
 			j testMovment_validity
 		
 		right_move:
+			li $t1, 1
+			sw $t1, panelLastMoveDir
 			lw $t1, keyRightMovement
 			sw $t1, panelMovement
 			sw $t1, panelMoved
