@@ -1,8 +1,7 @@
 # vim:set syntax=mips:
 
 # TODO: Consider make the game restartable
-# TODO: Ball got different angle when collide with panel.o
-# TODO:　Bugfix, find the reason why the ball didn't follow the direction of pusing
+# TODO: Ball got different angle when collide with panel.
 # TODO: Refactor code, remove useless property and clean up dirty word
 
 # Macros {{{
@@ -280,6 +279,7 @@
     ballSpeedSignY: .word -1
     ballBonusSpeed: .word 0
     ballProgressSpeed: .word 0			# the progress speed for breaking blocks
+    panelLastMoveDir: .word 0			# last direction
     
     ballProgressInc: .word 40			# the increment for breaking a block
     ballPushForce: .word 200			# the bonus speed for panel pushing
@@ -465,6 +465,8 @@
 		
 		sw $v0, passedms		# store the millisecond been passed since last waiting.
 		
+		sw $a0, lastms
+		
 		lw $a0, jreg+0
 		lw $a1, jreg+4
 		lw $ra, jreg+8
@@ -550,12 +552,14 @@
 		
 		setX:
 			beqz $a0, setY
-			lw $a0, ballSpeedSignX
+			sw $a0, ballSpeedSignX
 		setY:
 			beqz $a1, okkkk
-			lw $a1, ballSpeedSignY
-			
+			sw $a1, ballSpeedSignY
+		
 		okkkk:
+			li $t0, 1
+			sw $t0, requireSpeedUpdate
 			jr $ra
 		
 	
@@ -773,8 +777,6 @@
 							# call it 
 							jal collision_event
 							
-							li $a2, 0		# disable movement change for later collision event
-							
 							# set collided tag 
 							sll $t8, $a0, 2
 							sw $a0, blockCollided($t8)
@@ -791,6 +793,9 @@
 							li $a0, '\n'
 							li $v0, 11
 							syscall
+							
+							li $a2, 0		# disable movement change for later collision event
+							
 						
 						continue_scanning666:
                         subi $s2, $s2, 1
@@ -886,13 +891,7 @@
 				j finally_done
 			
 			finally_done:
-		
-			dprintc('c')
-			dprintc(':')
-			dprintr($a1)
-			dprintc('\n')
 			
-		
 		# test panel collision
 		next_collision_0:
 			lw $t0, panelObjectId
@@ -901,7 +900,8 @@
 			lw $t1, collisionPushByPanel
 			bne $t1, $a1, ok_nothing
 			pushByPanel:
-				li $t0, -3
+				lw $t0, ballHeight
+				sub $t0, $zero, $t0
 				sw $t0, ballYMovement
 				sw $t0, ballMoved
 
@@ -913,25 +913,14 @@
 				
 				# change ball direction based on the pushing direction
 				fentry($a0, $a1)
-					lw $a0, panelMovement
-					sge $a0, $a0, $zero
-					bnez $a0, postive		# if movement >  0
-					slt $a0, $a0, $zero
-					bnez $a0, negative		# if movement <  0
-					li $a0, 0				# if movement == 0
-					j ok6666
-						negative:
-							li $a0, -1
-						postive:
-							li $a0,  1
-						ok6666:
+					lw $a0, panelLastMoveDir
 					li $a1, -1
 					
+					beqz $a2, ok_nothing
 					jal setBallDirection
 				fexit($a0,$a1)
 				
-				dprintc('P')
-				dprintc('\n')
+
 				
 				j next_collision_1
 						
@@ -964,7 +953,7 @@
 			
 			ok_nothing2:
 				
-				beqz $a2, next_collision_2
+				beqz $a2, next_collision_1
 				jal collision_change_ball_movement
 		
 		# test block collision
@@ -1061,23 +1050,17 @@
 			sw $zero, ballYMovement
 			jal ballReverseXSpeed
 			jal ballReverseYSpeed
-			dprintc('R')
-			dprintc('\n')
 			j collisionMovement_end
 		
 		collisionLR_movement:
 			sw $zero, ballXMovement
 			sw $zero, ballYMovement
 			jal ballReverseXSpeed
-			dprintc('L')
-			dprintc('\n')
 			j collisionMovement_end
 		collisionTB_movement:
 			sw $zero, ballXMovement
 			sw $zero, ballYMovement
 			jal ballReverseYSpeed
-			dprintc('T')
-			dprintc('\n')
 			
 		collisionMovement_end:
 		fexit($ra)
@@ -1193,6 +1176,8 @@
 			lw $s6, ballY			# We store the original position for later use
 			sw $s0, ballX
 			sw $s1, ballY
+			sw $zero, ballXMovement
+			sw $zero, ballYMovement
 			sw $zero ballMoved
 			
 			# draw color on any condition
@@ -1365,12 +1350,16 @@
 		j handleInput_exit
 		
 		left_move:
+			li $t1, -1
+			sw $t1, panelLastMoveDir
 			lw $t1, keyLeftMovement
 			sw $t1, panelMovement
 			sw $t1, panelMoved
 			j testMovment_validity
 		
 		right_move:
+			li $t1, 1
+			sw $t1, panelLastMoveDir
 			lw $t1, keyRightMovement
 			sw $t1, panelMovement
 			sw $t1, panelMoved
