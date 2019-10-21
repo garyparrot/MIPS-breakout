@@ -208,52 +208,62 @@
 .data
 	preg: .word 0,0,0,0,0,0,0,0,0
 	jreg: .word 0,0,0,0,0,0,0,0,0
+	
+	# display related
 	screen_xsize: .word 128
 	screen_ysize: .word 64
 	screen_xbits: .word 7
-	block_width:  .word 8
-	block_height: .word 5
-	totBlocks:    .word 61
+	
+	# Game status 
 	gaming: 	  .word 1 		# is the game running? 
 	uWin:		  .word 0
 	uLose: 		  .word 0
 	gameCheating: .word 1		# cheating mode
-	frame:		  .word 0		# current frame index, that mean this game can run continusely about 24 days 
-	keyLeftMovement:  .word -6	
-	keyRightMovement: .word  6
-	
+    blockCollided: .space 256
+    requireSpeedUpdate: .word 0
+
 	# Blocks
-	# xpos, ypos, color, destroyed
+	totBlocks:    		.word 60
+    blockRemaining:	    .word 60
 	blocks: .word  
-		  4,  0,16729410, 0, 12,  0,16729410, 0, 20,  0,16729410, 0, 28,  0,16729410, 0, 36,  0,16729410, 0, 44,  0,16729410, 0, 52,  0,16729410, 0, 60,  0,16729410, 0, 68,  0,16729410, 0, 76,  0,16729410, 0, 84,  0,16729410, 0, 92,  0,16729410, 0,100,  0,16729410, 0,108,  0,16729410, 0,116,  0,16729410, 0,
-		  4,  5,16732751, 0, 12,  5,16732751, 0, 20,  5,16732751, 0, 28,  5,16732751, 0, 36,  5,16732751, 0, 44,  5,16732751, 0, 52,  5,16732751, 0, 60,  5,16732751, 0, 68,  5,16732751, 0, 76,  5,16732751, 0, 84,  5,16732751, 0, 92,  5,16732751, 0,100,  5,16732751, 0,108,  5,16732751, 0,116,  5,16732751, 0,
-		 12, 10,16739947, 0, 28, 10,16739947, 0, 44, 10,16739947, 0, 60, 10,16739947, 0, 76, 10,16739947, 0, 92, 10,16739947, 0,108, 10,16739947, 0,
-		  4, 15,16746373, 0, 20, 15,16746373, 0, 36, 15,16746373, 0, 52, 15,16746373, 0, 68, 15,16746373, 0, 84, 15,16746373, 0,100, 15,16746373, 0,116, 15,16746373, 0,
-		 12, 20,16751513, 0, 28, 20,16751513, 0, 44, 20,16751513, 0, 60, 20,16751513, 0, 76, 20,16751513, 0, 92, 20,16751513, 0,108, 20,16751513, 0,
-		  4, 25,16758453, 0, 20, 25,16758453, 0, 36, 25,16758453, 0, 52, 25,16758453, 0, 68, 25,16758453, 0, 84, 25,16758453, 0,100, 25,16758453, 0,116, 25,16758453, 0,
-		 60, 15,0xa83fd1, 2
+      4,  0,16746923, 0, 14,  0,16746955, 0, 24,  0,15960575, 0, 34,  0,11700735, 0, 44,  0, 9019391, 0, 54,  0, 9036031, 0, 64,  0, 9043934, 0, 74,  0, 9043869, 0, 84,  0,11861897, 0, 94,  0,16121737, 0,104,  0,16763273, 0,114,  0,16746889, 0,
+      4,  7,16746923, 0, 14,  7,16746955, 0, 24,  7,15960575, 0, 34,  7,11700735, 0, 44,  7, 9019391, 0, 54,  7, 9036031, 0, 64,  7, 9043934, 0, 74,  7, 9043869, 0, 84,  7,11861897, 0, 94,  7,16121737, 0,104,  7,16763273, 0,114,  7,16746889, 0,
+      4, 14,16746923, 0, 14, 14,16746955, 0, 24, 14,15960575, 0, 34, 14,11700735, 0, 44, 14, 9019391, 0, 54, 14, 9036031, 0, 64, 14, 9043934, 0, 74, 14, 9043869, 0, 84, 14,11861897, 0, 94, 14,16121737, 0,104, 14,16763273, 0,114, 14,16746889, 0,
+      4, 21,16746923, 0, 14, 21,16746955, 0, 24, 21,15960575, 0, 34, 21,11700735, 0, 44, 21, 9019391, 0, 54, 21, 9036031, 0, 64, 21, 9043934, 0, 74, 21, 9043869, 0, 84, 21,11861897, 0, 94, 21,16121737, 0,104, 21,16763273, 0,114, 21,16746889, 0,
+      4, 28,16746923, 0, 14, 28,16746955, 0, 24, 28,15960575, 0, 34, 28,11700735, 0, 44, 28, 9019391, 0, 54, 28, 9036031, 0, 64, 28, 9043934, 0, 74, 28, 9043869, 0, 84, 28,11861897, 0, 94, 28,16121737, 0,104, 28,16763273, 0,114, 28,16746889, 0,
+	block_width:  .word 10
+	block_height: .word 7
 
+	# Game Properties
+    ballProgressInc: 		.word  40			# the increment for breaking a block
+    ballPushForce: 			.word  200			# the bonus speed for panel pushing
+    blockCollisionLRSpeed:  .word  32			# the bonus speed for LR collision
+    ballCollideCenter: 		.word -128			# the bonus speed for panel center collision
+	keyLeftMovement:  		.word -6			# left movement distance of panel
+	keyRightMovement: 		.word  6			# right movement distance of panel
+    bonusSpeedMaximum: 		.word  1024			# the maximum value of bonus speed
+    bonusSpeedMinimum: 		.word -512			# the minimum value of bonus speed
 
-
-    blockCollided: .word 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-					     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-					     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-					     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    # Game constant
     blockStatusDestroyed:   .word 0x1
     blockStatusSpecial:		.word 0x2
-    blockRemaining:		    .word 61
-    blockProgressSpeed:	    .word 30
-  
+    # collision code
+    collisionCR: .word 3
+    collisionLR: .word 2
+    collisionTB: .word 1
+    collisionNP: .word 0
+    collisionPushByPanel: .word 4
     
     # panel
 	panelX: 	.word 58
-	panelY:		.word 61
+	panelY:		.word 59
 	panelWidth: .word 13
 	panelMoved: .word 1
 	panelMovement:  .word 0
 	panelColor: .word 0x00ffffff
 	panelObjectId: .word 63
 	panelStretch: .word 0
+    panelLastMoveDir: .word 0			# last direction
 
 	# ball
 	ballX:		.word 63
@@ -279,22 +289,6 @@
     ballSpeedSignY: .word -1
     ballBonusSpeed: .word 0
     ballProgressSpeed: .word 0			# the progress speed for breaking blocks
-    panelLastMoveDir: .word 0			# last direction
-    
-    ballProgressInc: .word 40			# the increment for breaking a block
-    ballPushForce: .word 200			# the bonus speed for panel pushing
-    blockCollisionLRSpeed: .word 32		# the bonus speed for LR collision
-    ballCollideCenter: .word -128		# the bonus speed for panel center collision
-    
-    bonusSpeedMaximum: .word  1024
-    bonusSpeedMinimum: .word -512
-    
-    # collision code
-    collisionCR: .word 3
-    collisionLR: .word 2
-    collisionTB: .word 1
-    collisionNP: .word 0
-    collisionPushByPanel: .word 4
     
     # drawline
     drawline_firstPixelPayload: 	.word 0
@@ -303,12 +297,11 @@
     drawline_targetColor:			.word 0
     drawline_anyColor:				.word 1
     
-    requireSpeedUpdate: .word 0
-	
 	# last frame system time
 	lastms: 	.word 0
 	passedms:   .word 0
 	
+	# pixel art
 	win_bitmap: .word 
             56, 30, 0x422400, 56, 31, 0x643a00, 56, 32, 0x4f2f00, 57, 28, 0x784700, 57, 29, 0x070502, 57, 30, 0x302617, 57, 31, 0x452f03, 57, 32, 0xdbac1a, 57, 33, 0xe1a312, 57, 34, 0x935a01, 
             58, 27, 0x895401, 58, 28, 0xf3c521, 58, 29, 0x2f2e28, 58, 30, 0x2c2c2b, 58, 32, 0x695b12, 58, 33, 0xfbce29, 58, 34, 0xf6ac1b, 58, 35, 0xab6903, 59, 26, 0x372000, 59, 27, 0xecb518, 
@@ -371,7 +364,6 @@
 			
 	# Game loop
 	# For now on, $s7 store the frame number
-	lw $s7, frame
 	GameLoop:
 		
 		# next frame
