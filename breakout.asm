@@ -1,7 +1,6 @@
 # vim:set syntax=mips:
 
 # TODO: Consider make the game restartable
-# TODO: Ball got different angle when collide with panel.
 # TODO: Refactor code, remove useless property and clean up dirty word
 
 # Macros {{{
@@ -22,7 +21,15 @@
 	lw $a0, preg+4
 	lw $v0, preg+8
 .end_macro
-
+.macro debug(%msg, %reg)
+	sw $a0, preg+0
+	la $a0, %msg
+	li $v0, 4
+	syscall
+	lw $a0, preg+0
+	dprintr(%reg)
+	dprintc('\n')
+.end_macro
 .macro dprintr(%reg)
 	sw $a0, jreg+0
 	sw $v0, jreg+4
@@ -247,6 +254,29 @@
     # Game constant
     blockStatusDestroyed:   .word 0x1
     blockStatusSpecial:		.word 0x2
+	sin_table: .word 
+		0x00000000,
+		0x3c8ef859,0x3d0ef2c6,0x3d565e3a,0x3d8edc7b,0x3db27eb6,0x3dd61305,0x3df996a2,0x3e0e8365,0x3e20305b,0x3e31d0d4,
+		0x3e43636f,0x3e54e6cd,0x3e665991,0x3e77ba5f,0x3e8483ee,0x3e8d2057,0x3e95b1be,0x3e9e377a,0x3ea6b0de,0x3eaf1d43,
+		0x3eb77c01,0x3ebfcc6f,0x3ec80de9,0x3ed03fc9,0x3ed8616b,0x3ee0722f,0x3ee87171,0x3ef05e93,0x3ef838f7,0x3f000000,
+		0x3f03d989,0x3f07a8ca,0x3f0b6d77,0x3f0f2744,0x3f12d5e8,0x3f167918,0x3f1a108c,0x3f1d9bfd,0x3f211b24,0x3f248dba,
+		0x3f27f37c,0x3f2b4c25,0x3f2e9772,0x3f31d521,0x3f3504f3,0x3f3826a7,0x3f3b39ff,0x3f3e3ebd,0x3f4134a5,0x3f441b7d,
+		0x3f46f309,0x3f49bb12,0x3f4c7360,0x3f4f1bbd,0x3f51b3f3,0x3f543bce,0x3f56b31d,0x3f5919ae,0x3f5b6f51,0x3f5db3d7,
+		0x3f5fe714,0x3f6208da,0x3f641901,0x3f66175e,0x3f6803c9,0x3f69de1d,0x3f6ba635,0x3f6d5bec,0x3f6eff20,0x3f708fb2,
+		0x3f720d81,0x3f737870,0x3f74d063,0x3f76153f,0x3f7746ea,0x3f78654d,0x3f797051,0x3f7a67e1,0x3f7b4beb,0x3f7c1c5c,
+		0x3f7cd925,0x3f7d8235,0x3f7e1781,0x3f7e98fd,0x3f7f069e,0x3f7f605c,0x3f7fa62f,0x3f7fd814,0x3f7ff605,0x3f800000
+	cos_table: .word
+		0x3f800000,
+		0x3f7ff605,0x3f7fd814,0x3f7fa62f,0x3f7f605c,0x3f7f069e,0x3f7e98fd,0x3f7e1781,0x3f7d8235,0x3f7cd925,0x3f7c1c5c,
+		0x3f7b4beb,0x3f7a67e2,0x3f797051,0x3f78654d,0x3f7746ea,0x3f76153f,0x3f74d063,0x3f737871,0x3f720d81,0x3f708fb2,
+		0x3f6eff21,0x3f6d5bec,0x3f6ba635,0x3f69de1e,0x3f6803ca,0x3f66175e,0x3f641901,0x3f6208db,0x3f5fe714,0x3f5db3d7,
+		0x3f5b6f51,0x3f5919ae,0x3f56b31d,0x3f543bcf,0x3f51b3f3,0x3f4f1bbd,0x3f4c7361,0x3f49bb13,0x3f46f30a,0x3f441b7d,
+		0x3f4134a6,0x3f3e3ebd,0x3f3b39ff,0x3f3826a7,0x3f3504f3,0x3f31d522,0x3f2e9772,0x3f2b4c25,0x3f27f37c,0x3f248dbb,
+		0x3f211b24,0x3f1d9bfe,0x3f1a108d,0x3f167918,0x3f12d5e8,0x3f0f2744,0x3f0b6d77,0x3f07a8ca,0x3f03d989,0x3f000000,
+		0x3ef838f8,0x3ef05e94,0x3ee87172,0x3ee0722f,0x3ed8616c,0x3ed03fca,0x3ec80dea,0x3ebfcc70,0x3eb77c02,0x3eaf1d44,
+		0x3ea6b0df,0x3e9e377a,0x3e95b1bf,0x3e8d2058,0x3e8483ef,0x3e77ba61,0x3e665993,0x3e54e6cf,0x3e436370,0x3e31d0d6,
+		0x3e20305d,0x3e0e8366,0x3df996a6,0x3dd61308,0x3db27eb9,0x3d8edc7f,0x3d565e41,0x3d0ef2cd,0x3c8ef868,0x32e62a9a,
+
     # collision code
     collisionCR: .word 3
     collisionLR: .word 2
@@ -282,13 +312,13 @@
 	ballFollowPanel:  	.word  1
 	ballFollowOffsetX: 	.word  5
 	ballFollowOffsetY:  .word -5
-    ballInitialSpeedX:  .word  35		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSignX
-    ballInitialSpeedY:  .word  35		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSignY
+    ballInitialSpeed:	.word  35		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSign
     ballTouchBottomWall: .word 0
     ballSpeedSignX: .word  1
     ballSpeedSignY: .word -1
     ballBonusSpeed: .word 0
     ballProgressSpeed: .word 0			# the progress speed for breaking blocks
+    ballAngle: .word 45
     
     # drawline
     drawline_firstPixelPayload: 	.word 0
@@ -598,63 +628,90 @@
 		sw $t0, requireSpeedUpdate
 
 		jr $ra
+	
+	# Increase the angle of ball
+	# $a0: the increment angle (degree unit)
+	increaseBallAngle:
+		lw $t0, ballAngle
+		add $t0, $a0, $t0
+
+		# test if the value exceed 90 or less than 0
+		li $t1, 90
+		bgt $t0, $t1, toomuch
+		li $t1, 25
+		blt $t0, $t5, tooless
+		j nothing_you
+
+		toomuch:
+			li $t0, 90
+			j nothing_you
+		tooless:
+			li $t0, 0
+			j nothing_you
+		nothing_you:
+
+		sw $t0, ballAngle
+		li $t0, 1
+		sw $t0, requireSpeedUpdate
+
+		jr $ra
+		
 		
 	# update the ball speed
 	updateSpeed:
-		# formula for speed: speedSign * initialSpeed * ( 1 + progress speed / 1024 ) * ( 1 + bonus speed / 1024 ) 
+		# formula for X speed: speedSign * initialSpeed * cos(angle) * ( 1 + progress_speed / 1024 + bonus_speed / 1024 )
+		# formula for Y speed: speedSign * initialSpeed * sin(angle) * ( 1 + progress_speed / 1024 + bonus_speed / 1024 )
 		# speedSign will be 1 or -1, based on the moving direction. Change when collision with wall or blocks
 		# progress speed come from game progress, every time a block been destroyed, the value increase.
 		# bonus speed based on other event. e.g. ball pushed by panel / ball hitting on the center of board
 		fentry($s0,$s1,$s2,$s3)
+		lw $s1 ballAngle
+		sll $s1, $s1, 2
 		
-		lw $s0, ballInitialSpeedX
-		lw $s1, ballProgressSpeed
-		lw $s2, ballBonusSpeed
-		li $s3, 1024
-		add $s1, $s1, $s3
-		add $s2, $s2, $s3
+		lw $s0, ballInitialSpeed
+		lw $t0, ballProgressSpeed
+		lw $t1, ballBonusSpeed
+		li $t2, 1024
+		add $t0, $t0, $t1
+		add $t0, $t0, $t2		# $t0 = ( 1024 + bonus_speed + progress_speed )
 		mtc1 $s0, $f0			# load everything into coprocesss1 registers
-		mtc1 $s1, $f1
-		mtc1 $s2, $f2
-		mtc1 $s3, $f3
+		mtc1 $t0, $f1
+		mtc1 $t2, $f2
+		lwc1 $f3, cos_table($s1)
 		cvt.s.w $f0, $f0		# convert them into single floating point value
 		cvt.s.w $f1, $f1
 		cvt.s.w $f2, $f2
-		cvt.s.w $f3, $f3
-		div.s $f1, $f1, $f3		# doing calculate
-		div.s $f2, $f2, $f3
+		div.s $f1, $f1, $f2		# $f1 = ( 1024 + bonus_speed + progress_speed )  / 1024
 		mul.s $f0, $f0, $f1
-		mul.s $f0, $f0, $f2
+		mul.s $f0, $f0, $f3		# $f1 = $f1 * cos(angle)
 		cvt.w.s $f0, $f0
 		mfc1 $s0, $f0			# get the speed
 		
-		lw $s1, ballSpeedSignX
-		mul $s0, $s0, $s1
+		lw $t1, ballSpeedSignX
+		mul $s0, $s0, $t1
 		sw $s0, ballSpeedX
-				
-		lw $s0, ballInitialSpeedY
-		lw $s1, ballProgressSpeed
-		lw $s2, ballBonusSpeed
-		li $s3, 1024
-		add $s1, $s1, $s3
-		add $s2, $s2, $s3
+		
+		lw $s0, ballInitialSpeed
+		lw $t0, ballProgressSpeed
+		lw $t1, ballBonusSpeed
+		li $t2, 1024
+		add $t0, $t0, $t1
+		add $t0, $t0, $t2		# $t0 = ( 1024 + bonus_speed + progress_speed )
 		mtc1 $s0, $f0			# load everything into coprocesss1 registers
-		mtc1 $s1, $f1
-		mtc1 $s2, $f2
-		mtc1 $s3, $f3
+		mtc1 $t0, $f1
+		mtc1 $t2, $f2
+		lwc1 $f3, sin_table($s1)
 		cvt.s.w $f0, $f0		# convert them into single floating point value
 		cvt.s.w $f1, $f1
 		cvt.s.w $f2, $f2
-		cvt.s.w $f3, $f3
-		div.s $f1, $f1, $f3		# doing calculate
-		div.s $f2, $f2, $f3
+		div.s $f1, $f1, $f2		# $f1 = ( 1024 + bonus_speed + progress_speed )  / 1024
 		mul.s $f0, $f0, $f1
-		mul.s $f0, $f0, $f2
+		mul.s $f0, $f0, $f3		# $f1 = $f1 * sin(angle)
 		cvt.w.s $f0, $f0
 		mfc1 $s0, $f0			# get the speed
 		
-		lw $s1, ballSpeedSignY
-		mul $s0, $s0, $s1
+		lw $t1, ballSpeedSignY
+		mul $s0, $s0, $t1
 		sw $s0, ballSpeedY
 		
 		fexit($s0,$s1,$s2,$s3)
@@ -937,7 +994,7 @@
 				srl $t1, $t1, 1
 				slt $t0, $t0, $t1		# test if the ball hitting the center area
 				beqz $t0, ok_nothing2
-					
+				
 					fentry($a0)
 						lw $a0, ballCollideCenter
 						jal increaseBonusSpeed
@@ -945,6 +1002,7 @@
 			
 			ok_nothing2:
 				
+				# Change the movement of ball based on collision info
 				beqz $a2, next_collision_1
 				jal collision_change_ball_movement
 		
@@ -1028,7 +1086,7 @@
 	# $a0: the object id 
 	# $a1: the direction code
 	collision_change_ball_movement:
-		fentry($ra)
+		fentry($ra,$a0,$a1)
 		lw $t0, collisionLR
 		lw $t1, collisionTB
 		lw $t2, collisionCR
@@ -1055,7 +1113,33 @@
 			jal ballReverseYSpeed
 			
 		collisionMovement_end:
-		fexit($ra)
+		
+		changeAngle:
+			# if the collided object is panel, change angle based on the hitting position
+			lw $t0, panelObjectId
+			bne $a0, $t0, changeAngle_end
+			
+			lw $t0, panelWidth
+			srl $t0, $t0, 1
+			lw $t1, panelX
+			add $t0, $t1, $t0
+			addi $t0, $t0, 1		# $t0 = the coordinate of panel center
+			lw $t1, ballX
+			lw $t2, ballWidth
+			srl $t2, $t2, 1
+			add $t1, $t2, $t1
+			addi $t1, $t1, 1		# $t1 = the coordinate of ball 
+			sub $t0, $t0, $t1
+			abs $t0, $t0			# $t0 = distance between panel and ball x coordinate
+			
+			lw $t1, panelWidth
+			srl $t1, $t1, 2
+			sub $a0, $t1, $t0
+			jal increaseBallAngle
+			
+		changeAngle_end:
+		
+		fexit($ra,$a0,$a1)
 		jr $ra
 	
 	# this subroutine calcuate the max distance between two integer set {$a0, $a1}, {$a2, $a3}
