@@ -1,7 +1,6 @@
 # vim:set syntax=mips:
 
 # TODO: Consider make the game restartable
-# TODO: Ball got different angle when collide with panel.
 # TODO: Refactor code, remove useless property and clean up dirty word
 
 # Macros {{{
@@ -22,7 +21,15 @@
 	lw $a0, preg+4
 	lw $v0, preg+8
 .end_macro
-
+.macro debug(%msg, %reg)
+	sw $a0, preg+0
+	la $a0, %msg
+	li $v0, 4
+	syscall
+	lw $a0, preg+0
+	dprintr(%reg)
+	dprintc('\n')
+.end_macro
 .macro dprintr(%reg)
 	sw $a0, jreg+0
 	sw $v0, jreg+4
@@ -627,11 +634,12 @@
 	increaseBallAngle:
 		lw $t0, ballAngle
 		add $t0, $a0, $t0
-		li $t1, 90
 
 		# test if the value exceed 90 or less than 0
+		li $t1, 90
 		bgt $t0, $t1, toomuch
-		blt $t0, $zero, tooless
+		li $t1, 25
+		blt $t0, $t5, tooless
 		j nothing_you
 
 		toomuch:
@@ -986,7 +994,7 @@
 				srl $t1, $t1, 1
 				slt $t0, $t0, $t1		# test if the ball hitting the center area
 				beqz $t0, ok_nothing2
-					
+				
 					fentry($a0)
 						lw $a0, ballCollideCenter
 						jal increaseBonusSpeed
@@ -994,6 +1002,7 @@
 			
 			ok_nothing2:
 				
+				# Change the movement of ball based on collision info
 				beqz $a2, next_collision_1
 				jal collision_change_ball_movement
 		
@@ -1077,7 +1086,7 @@
 	# $a0: the object id 
 	# $a1: the direction code
 	collision_change_ball_movement:
-		fentry($ra)
+		fentry($ra,$a0,$a1)
 		lw $t0, collisionLR
 		lw $t1, collisionTB
 		lw $t2, collisionCR
@@ -1104,7 +1113,33 @@
 			jal ballReverseYSpeed
 			
 		collisionMovement_end:
-		fexit($ra)
+		
+		changeAngle:
+			# if the collided object is panel, change angle based on the hitting position
+			lw $t0, panelObjectId
+			bne $a0, $t0, changeAngle_end
+			
+			lw $t0, panelWidth
+			srl $t0, $t0, 1
+			lw $t1, panelX
+			add $t0, $t1, $t0
+			addi $t0, $t0, 1		# $t0 = the coordinate of panel center
+			lw $t1, ballX
+			lw $t2, ballWidth
+			srl $t2, $t2, 1
+			add $t1, $t2, $t1
+			addi $t1, $t1, 1		# $t1 = the coordinate of ball 
+			sub $t0, $t0, $t1
+			abs $t0, $t0			# $t0 = distance between panel and ball x coordinate
+			
+			lw $t1, panelWidth
+			srl $t1, $t1, 2
+			sub $a0, $t1, $t0
+			jal increaseBallAngle
+			
+		changeAngle_end:
+		
+		fexit($ra,$a0,$a1)
 		jr $ra
 	
 	# this subroutine calcuate the max distance between two integer set {$a0, $a1}, {$a2, $a3}
