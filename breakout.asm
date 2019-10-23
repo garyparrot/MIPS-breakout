@@ -1,89 +1,9 @@
 # vim:set syntax=mips:
 
-# TODO: Consider make the game restartable
+# TODO: Remove the limit of blcok amount.
 # TODO: Refactor code, remove useless property and clean up dirty word
 
 # Macros {{{
-
-.macro allocBitmap(%xsize, %ysize)
-	sw $t7, preg+0
-	sw $a0, preg+4
-	sw $v0, preg+8
-	
-	# sbrk: allocate space for bitmap  
-	lw $a0, %xsize
-	lw $t7, %ysize
-	mul $a0, $a0, $t7
-	li $v0, 9
-	syscall
-	
-	lw $t7, preg+0
-	lw $a0, preg+4
-	lw $v0, preg+8
-.end_macro
-.macro debug(%msg, %reg)
-	sw $a0, preg+0
-	la $a0, %msg
-	li $v0, 4
-	syscall
-	lw $a0, preg+0
-	dprintr(%reg)
-	dprintc('\n')
-.end_macro
-.macro dprintr(%reg)
-	sw $a0, jreg+0
-	sw $v0, jreg+4
-	add $a0, %reg, $zero
-	li $v0, 1
-	syscall
-	lw $a0, jreg+0
-	lw $v0, jreg+4
-.end_macro
-.macro dprintc(%chr)
-	sw $a0, jreg+0
-	sw $v0, jreg+4
-	li $a0, %chr
-	li $v0, 11
-	syscall
-	lw $a0, jreg+0
-	lw $v0, jreg+4
-.end_macro
-
-.macro setFirstPixelPayload(%id, %direction)
-	sw $t7, preg+0
-	lw $t7, %direction
-	sll $t7, $t7, 6
-	or $t7, $t7, %id
-	sw $t7, drawline_firstPixelPayload
-	lw $t7, preg+0
-.end_macro
-.macro setMiddlePixelPayload(%id, %direction)
-	sw $t7, preg+0
-	lw $t7, %direction
-	sll $t7, $t7, 6
-	or $t7, $t7, %id
-	sw $t7, drawline_middlePixelPayload
-	lw $t7, preg+0
-.end_macro
-.macro setLastPixelPayload(%id, %direction)
-	sw $t7, preg+0
-	lw $t7, %direction
-	sll $t7, $t7, 6
-	or $t7, $t7, %id
-	sw $t7, drawline_lastPixelPayload
-	lw $t7, preg+0
-.end_macro
-
-.macro maxdiff(%a0,%a1,%a2,%a3,%res)
-	fentry($a0,$a1,$a2,$a3)
-	add $a0, %a0, $zero
-	add $a1, %a1, $zero
-	add $a2, %a2, $zero
-	add $a3, %a3, $zero
-	jal _maxdiff
-	add %res, $v0, $zero
-	fexit($a0,$a1,$a2,$a3)
-.end_macro
 
 .macro fentry(%a)
 	addi $sp, $sp, -4
@@ -131,46 +51,117 @@
 	addi $sp, $sp, 16
 .end_macro
 
+.macro allocBitmap(%xsize, %ysize)
+	fentry($t7,$a0,$v0)
+	
+	# sbrk: allocate space for bitmap  
+	lw $a0, %xsize
+	lw $t7, %ysize
+	mul $a0, $a0, $t7
+	li $v0, 9
+	syscall
+	
+	fexit($t7,$a0,$v0)
+.end_macro
+.macro debug(%msg, %reg)
+	fentry($a0)
+	la $a0, %msg
+	li $v0, 4
+	syscall
+	fexit($a0)
+	dprintr(%reg)
+	dprintc('\n')
+.end_macro
+.macro dprintr(%reg)
+	fentry($a0,$v0)
+	add $a0, %reg, $zero
+	li $v0, 1
+	syscall
+	fexit($a0,$v0)
+.end_macro
+.macro dprintc(%chr)
+	fentry($a0,$v0)
+	li $a0, %chr
+	li $v0, 11
+	syscall
+	fexit($a0,$v0)
+.end_macro
+
+.macro setFirstPixelPayload(%id, %direction)
+	fentry($t7)
+	lw $t7, %direction
+	sll $t7, $t7, 6
+	or $t7, $t7, %id
+	sw $t7, drawline_firstPixelPayload
+	fexit($t7)
+.end_macro
+.macro setMiddlePixelPayload(%id, %direction)
+	fentry($t7)
+	lw $t7, %direction
+	sll $t7, $t7, 6
+	or $t7, $t7, %id
+	sw $t7, drawline_middlePixelPayload
+	fexit($t7)
+.end_macro
+.macro setLastPixelPayload(%id, %direction)
+	fentry($t7)
+	lw $t7, %direction
+	sll $t7, $t7, 6
+	or $t7, $t7, %id
+	sw $t7, drawline_lastPixelPayload
+	fexit($t7)
+.end_macro
+
+.macro maxdiff(%a0,%a1,%a2,%a3,%res)
+	fentry($a0,$a1,$a2,$a3)
+	add $a0, %a0, $zero
+	add $a1, %a1, $zero
+	add $a2, %a2, $zero
+	add $a3, %a3, $zero
+	jal _maxdiff
+	add %res, $v0, $zero
+	fexit($a0,$a1,$a2,$a3)
+.end_macro
+
+
 .macro getXpos(%block_id,%save_target)
-	sw %block_id, preg+0
+	fentry(%block_id)
 	sll %block_id, %block_id, 4
 	lw %save_target, blocks+0(%block_id)
-	lw %block_id, preg+0
+	fexit(%block_id)
 .end_macro
 
 .macro getYpos(%block_id,%save_target)
-	sw %block_id, preg+0
+	fentry(%block_id)
 	sll %block_id, %block_id, 4
 	lw %save_target, blocks+4(%block_id)
-	lw %block_id, preg+0
+	fexit(%block_id)
 .end_macro
 
 .macro getColor(%block_id,%save_target)
-	sw %block_id, preg+0
+	fentry(%block_id)
 	sll %block_id, %block_id, 4
 	lw %save_target, blocks+8(%block_id)
-	lw %block_id, preg+0
+	fexit(%block_id)
 .end_macro
 
 .macro getStatus(%block_id,%save_target)
-	sw %block_id, preg+0
+	fentry(%block_id)
 	sll %block_id, %block_id, 4
 	lw %save_target, blocks+12(%block_id)
-	lw %block_id, preg+0
+	fexit(%block_id)
 .end_macro
 
 .macro setStatusDestoryed(%block_id)
-	sw %block_id, preg+0
-	sw $t7, preg+4
-	sw $t8, preg+8
+	fentry(%block_id,$t7,$t8)
+	
 	sll %block_id, %block_id, 4
 	lw $t7, blocks+12(%block_id)
 	lw $t8, blockStatusDestroyed
 	or $t7, $t7, $t8
 	sw $t7, blocks+12(%block_id)
-	lw $t7, preg+4
-	lw $t8, preg+8
-	lw %block_id, preg+0
+	
+	fexit(%block_id,$t7,$t8)
 .end_macro
 
 .macro drawBlockR(%block_id)
@@ -192,11 +183,11 @@
 .end_macro
 
 .macro panelRight(%reg)
-	sw $t7, preg+0
+	fentry($t7)
 	lw %reg, panelX
 	lw $t7, panelWidth
 	add %reg, %reg, $t7
-	lw $t7, preg+0
+	fexit($t7)
 .end_macro
 
 .macro panelLeft(%reg)
@@ -213,8 +204,6 @@
 # Data {{{
 
 .data
-	preg: .word 0,0,0,0,0,0,0,0,0
-	jreg: .word 0,0,0,0,0,0,0,0,0
 	
 	# display related
 	screen_xsize: .word 128
@@ -474,9 +463,7 @@
 # waitNextClock {{{
 
 	waitNextClock:
-		sw $a0, jreg+0
-		sw $a1, jreg+4
-		sw $ra, jreg+8
+		fentry($a0,$a1,$ra)
 		
 		keepWaiting:
 		li $v0, 30
@@ -489,9 +476,7 @@
 		
 		sw $a0, lastms
 		
-		lw $a0, jreg+0
-		lw $a1, jreg+4
-		lw $ra, jreg+8
+		fexit($a0,$a1,$ra)
 		jr $ra
 	
 	# given two 32bit value A and B, return the distance between two value
