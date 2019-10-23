@@ -1,89 +1,8 @@
 # vim:set syntax=mips:
 
-# TODO: Consider make the game restartable
-# TODO: Refactor code, remove useless property and clean up dirty word
+# TODO: Remove the limit of blcok amount.
 
 # Macros {{{
-
-.macro allocBitmap(%xsize, %ysize)
-	sw $t7, preg+0
-	sw $a0, preg+4
-	sw $v0, preg+8
-	
-	# sbrk: allocate space for bitmap  
-	lw $a0, %xsize
-	lw $t7, %ysize
-	mul $a0, $a0, $t7
-	li $v0, 9
-	syscall
-	
-	lw $t7, preg+0
-	lw $a0, preg+4
-	lw $v0, preg+8
-.end_macro
-.macro debug(%msg, %reg)
-	sw $a0, preg+0
-	la $a0, %msg
-	li $v0, 4
-	syscall
-	lw $a0, preg+0
-	dprintr(%reg)
-	dprintc('\n')
-.end_macro
-.macro dprintr(%reg)
-	sw $a0, jreg+0
-	sw $v0, jreg+4
-	add $a0, %reg, $zero
-	li $v0, 1
-	syscall
-	lw $a0, jreg+0
-	lw $v0, jreg+4
-.end_macro
-.macro dprintc(%chr)
-	sw $a0, jreg+0
-	sw $v0, jreg+4
-	li $a0, %chr
-	li $v0, 11
-	syscall
-	lw $a0, jreg+0
-	lw $v0, jreg+4
-.end_macro
-
-.macro setFirstPixelPayload(%id, %direction)
-	sw $t7, preg+0
-	lw $t7, %direction
-	sll $t7, $t7, 6
-	or $t7, $t7, %id
-	sw $t7, drawline_firstPixelPayload
-	lw $t7, preg+0
-.end_macro
-.macro setMiddlePixelPayload(%id, %direction)
-	sw $t7, preg+0
-	lw $t7, %direction
-	sll $t7, $t7, 6
-	or $t7, $t7, %id
-	sw $t7, drawline_middlePixelPayload
-	lw $t7, preg+0
-.end_macro
-.macro setLastPixelPayload(%id, %direction)
-	sw $t7, preg+0
-	lw $t7, %direction
-	sll $t7, $t7, 6
-	or $t7, $t7, %id
-	sw $t7, drawline_lastPixelPayload
-	lw $t7, preg+0
-.end_macro
-
-.macro maxdiff(%a0,%a1,%a2,%a3,%res)
-	fentry($a0,$a1,$a2,$a3)
-	add $a0, %a0, $zero
-	add $a1, %a1, $zero
-	add $a2, %a2, $zero
-	add $a3, %a3, $zero
-	jal _maxdiff
-	add %res, $v0, $zero
-	fexit($a0,$a1,$a2,$a3)
-.end_macro
 
 .macro fentry(%a)
 	addi $sp, $sp, -4
@@ -131,46 +50,117 @@
 	addi $sp, $sp, 16
 .end_macro
 
+.macro allocBitmap(%xsize, %ysize)
+	fentry($t7,$a0,$v0)
+	
+	# sbrk: allocate space for bitmap  
+	lw $a0, %xsize
+	lw $t7, %ysize
+	mul $a0, $a0, $t7
+	li $v0, 9
+	syscall
+	
+	fexit($t7,$a0,$v0)
+.end_macro
+.macro debug(%msg, %reg)
+	fentry($a0)
+	la $a0, %msg
+	li $v0, 4
+	syscall
+	fexit($a0)
+	dprintr(%reg)
+	dprintc('\n')
+.end_macro
+.macro dprintr(%reg)
+	fentry($a0,$v0)
+	add $a0, %reg, $zero
+	li $v0, 1
+	syscall
+	fexit($a0,$v0)
+.end_macro
+.macro dprintc(%chr)
+	fentry($a0,$v0)
+	li $a0, %chr
+	li $v0, 11
+	syscall
+	fexit($a0,$v0)
+.end_macro
+
+.macro setFirstPixelPayload(%id, %direction)
+	fentry($t7)
+	lw $t7, %direction
+	sll $t7, $t7, 6
+	or $t7, $t7, %id
+	sw $t7, drawline_firstPixelPayload
+	fexit($t7)
+.end_macro
+.macro setMiddlePixelPayload(%id, %direction)
+	fentry($t7)
+	lw $t7, %direction
+	sll $t7, $t7, 6
+	or $t7, $t7, %id
+	sw $t7, drawline_middlePixelPayload
+	fexit($t7)
+.end_macro
+.macro setLastPixelPayload(%id, %direction)
+	fentry($t7)
+	lw $t7, %direction
+	sll $t7, $t7, 6
+	or $t7, $t7, %id
+	sw $t7, drawline_lastPixelPayload
+	fexit($t7)
+.end_macro
+
+.macro maxdiff(%a0,%a1,%a2,%a3,%res)
+	fentry($a0,$a1,$a2,$a3)
+	add $a0, %a0, $zero
+	add $a1, %a1, $zero
+	add $a2, %a2, $zero
+	add $a3, %a3, $zero
+	jal _maxdiff
+	add %res, $v0, $zero
+	fexit($a0,$a1,$a2,$a3)
+.end_macro
+
+
 .macro getXpos(%block_id,%save_target)
-	sw %block_id, preg+0
+	fentry(%block_id)
 	sll %block_id, %block_id, 4
 	lw %save_target, blocks+0(%block_id)
-	lw %block_id, preg+0
+	fexit(%block_id)
 .end_macro
 
 .macro getYpos(%block_id,%save_target)
-	sw %block_id, preg+0
+	fentry(%block_id)
 	sll %block_id, %block_id, 4
 	lw %save_target, blocks+4(%block_id)
-	lw %block_id, preg+0
+	fexit(%block_id)
 .end_macro
 
 .macro getColor(%block_id,%save_target)
-	sw %block_id, preg+0
+	fentry(%block_id)
 	sll %block_id, %block_id, 4
 	lw %save_target, blocks+8(%block_id)
-	lw %block_id, preg+0
+	fexit(%block_id)
 .end_macro
 
 .macro getStatus(%block_id,%save_target)
-	sw %block_id, preg+0
+	fentry(%block_id)
 	sll %block_id, %block_id, 4
 	lw %save_target, blocks+12(%block_id)
-	lw %block_id, preg+0
+	fexit(%block_id)
 .end_macro
 
 .macro setStatusDestoryed(%block_id)
-	sw %block_id, preg+0
-	sw $t7, preg+4
-	sw $t8, preg+8
+	fentry(%block_id,$t7,$t8)
+	
 	sll %block_id, %block_id, 4
 	lw $t7, blocks+12(%block_id)
 	lw $t8, blockStatusDestroyed
 	or $t7, $t7, $t8
 	sw $t7, blocks+12(%block_id)
-	lw $t7, preg+4
-	lw $t8, preg+8
-	lw %block_id, preg+0
+	
+	fexit(%block_id,$t7,$t8)
 .end_macro
 
 .macro drawBlockR(%block_id)
@@ -192,11 +182,11 @@
 .end_macro
 
 .macro panelRight(%reg)
-	sw $t7, preg+0
+	fentry($t7)
 	lw %reg, panelX
 	lw $t7, panelWidth
 	add %reg, %reg, $t7
-	lw $t7, preg+0
+	fexit($t7)
 .end_macro
 
 .macro panelLeft(%reg)
@@ -213,8 +203,6 @@
 # Data {{{
 
 .data
-	preg: .word 0,0,0,0,0,0,0,0,0
-	jreg: .word 0,0,0,0,0,0,0,0,0
 	
 	# display related
 	screen_xsize: .word 128
@@ -364,6 +352,11 @@
 # }}}
 	
 .text
+    
+# -------------------------------------------
+# -  main: the main entry of breakout game  -
+# -------------------------------------------
+main:
 	# allocate space
 	jal allocMemory
 	
@@ -423,6 +416,9 @@
 	
 # gameCheck {{{
 
+# -------------------------------------
+# -  gameCheck: checking game status. -
+# -------------------------------------
 	gameCheck:
 		fentry($ra)
 		
@@ -473,10 +469,11 @@
 
 # waitNextClock {{{
 
+# -------------------------------------------------------------------------
+# -  waitNextClock: Wait for a frame time, it should be greater than 1ms  -
+# -------------------------------------------------------------------------
 	waitNextClock:
-		sw $a0, jreg+0
-		sw $a1, jreg+4
-		sw $ra, jreg+8
+		fentry($a0,$a1,$ra)
 		
 		keepWaiting:
 		li $v0, 30
@@ -489,9 +486,7 @@
 		
 		sw $a0, lastms
 		
-		lw $a0, jreg+0
-		lw $a1, jreg+4
-		lw $ra, jreg+8
+		fexit($a0,$a1,$ra)
 		jr $ra
 	
 	# given two 32bit value A and B, return the distance between two value
@@ -509,6 +504,9 @@
 	
 # movingEvent {{{
 
+# -----------------------------------------------------
+# -  movingEvent: game procedure, make the ball move  -
+# -----------------------------------------------------
 	movingEvent:
 		moveBall:
 			# move ball every frame
@@ -558,7 +556,9 @@
 	
 # ball speed & direction {{{
 	
-	# Reverse the speed of Y direction
+    # -----------------------------------------------------
+    # -  ballReverseYSpeed: flip ball's y speed direction -
+    # -----------------------------------------------------
 	ballReverseYSpeed:
 		lw $t0, ballSpeedSignY
 		sub $t0, $zero, $t0
@@ -568,8 +568,14 @@
 		
 		jr $ra
 		
-	# $a0, the x direction. 1 move right, -1 move left, 0 no changes
-	# $a1, the y direction. 1 move down, -1 move up, 0 no changes
+    # --------------------------------------------------------------
+    # -  setBallDirection: setting the ball's moving direction     -
+    # -                    $a0: the x direction                    -
+    # -                    $a1: the y direction                    -
+    # -                         1 for right/down direction         -
+    # -                        -1 for left/up direction            -
+    # -                         0 for no changes                   -
+    # --------------------------------------------------------------
 	setBallDirection:
 		
 		setX:
@@ -585,7 +591,9 @@
 			jr $ra
 		
 	
-	# Reverse the speed of X direction
+    # -----------------------------------------------------
+    # -  ballReverseXSpeed: flip ball's x speed direction -
+    # -----------------------------------------------------
 	ballReverseXSpeed:
 		lw $t0, ballSpeedSignX
 		sub $t0, $zero, $t0
@@ -595,7 +603,10 @@
 		
 		jr $ra
 	
-	# $a0: the speed gonna increase	
+    # -----------------------------------------------------------
+    # -  increaseBonusSpeed: increase the bonus speed for ball  -
+    # -                      $a0: the increment for bonus speed -
+    # -----------------------------------------------------------
 	increaseBonusSpeed:
 		lw $t0, ballBonusSpeed
 		add $t0, $t0, $a0
@@ -619,6 +630,10 @@
 		
 		jr $ra
 		
+    # -----------------------------------------------------------------
+    # -  increaseProgressSpeed: increase the progress speed for ball  -
+    # -                         $a0: the increment for progress speed -
+    # -----------------------------------------------------------------
 	increaseProgressSpeed:
 
 		lw $t0, ballProgressSpeed
@@ -629,8 +644,12 @@
 
 		jr $ra
 	
-	# Increase the angle of ball
-	# $a0: the increment angle (degree unit)
+    # ----------------------------------------------------------------------
+    # -  increaseBallAngle: increase ball's angle by $a0                   -
+    # -                     $a0: the increment of ball angle in degree unit-
+    # -                 
+    # -                     Notice the angle will be limit in 25~90        -
+    # ----------------------------------------------------------------------
 	increaseBallAngle:
 		lw $t0, ballAngle
 		add $t0, $a0, $t0
@@ -657,7 +676,9 @@
 		jr $ra
 		
 		
-	# update the ball speed
+    # -------------------------------
+    # -  updateSpeed: update speed  -
+    # -------------------------------
 	updateSpeed:
 		# formula for X speed: speedSign * initialSpeed * cos(angle) * ( 1 + progress_speed / 1024 + bonus_speed / 1024 )
 		# formula for Y speed: speedSign * initialSpeed * sin(angle) * ( 1 + progress_speed / 1024 + bonus_speed / 1024 )
@@ -721,6 +742,9 @@
 	
 # collisionHandler {{{
 
+    # ------------------------------------------------------------------
+    # -  collisionHandler: game procedure for handle object collision  -
+    # ------------------------------------------------------------------
 	collisionHandler:
         fentry($s0,$s1,$ra)
 	
@@ -1167,6 +1191,9 @@
 	
 # render {{{
 
+    # ------------------------------------------------------------------
+    # -  render: game procedure for painting object on bitmap display  -
+    # ------------------------------------------------------------------
 	render:
 		# TODO: Optimize the render process
 		
@@ -1368,7 +1395,7 @@
 			jr $ra
 	
 	# draw Pixel art
-	# $a0, the beginning of pixel art array address, each entry are 3 word long, represent [x,y,color]. The array is null-terminated, means [0,0,0]		
+	# $a0, the beginning of pixel art array address, each entry are 3 word long, represent [x,y,color]. The array is null-terminated
 	drawPixelArt:
 		fentry($a0)
 		
@@ -1409,7 +1436,9 @@
 
 # handleInput {{{
 
-	# handle input
+    # -------------------------------------------------------
+    # -  handleInput: game procedure for handle user input  -
+    # -------------------------------------------------------
 	handleInput:
 		fentry($ra)
 		lw $t1, 0xffff0000
@@ -1560,7 +1589,19 @@
 		
 # drawline {{{
 
-	# This method draw a line between [$a0, $a1) with color $a3 on y $a2
+    # ---------------------------------------------------------------------------------------------------------------------------
+    # -  drawline: draw a line on screen                                                                                        -
+    # -            $a0: the index of first x coordinate                                                                         -
+    # -            $a1: the index of end x coordinate                                                                           -
+    # -            $a2: the index of y coordinate                                                                               -
+    # -            $a2: color                                                                                                   -   
+    # -   global parameter                                                                                                      -
+    # -      drawline_firstPixelPayload : Payload for first pixel                                                               -
+    # -      drawline_middlePixelPayload: Payload for middle pixel                                                              -
+    # -      drawline_lastPixelPayload  : Payload for last pixel                                                                -
+    # -      drawline_targetColor       : Only draw pixel on specific color                                                     -
+    # -      drawline_anyColor          : Draw pixel on any color, this parameter will overwrite rule of targetColor if enabled -
+    # ---------------------------------------------------------------------------------------------------------------------------
 	drawline:
 		fentry($a0,$a1,$a2,$s0)
 		
