@@ -1,7 +1,6 @@
 # vim:set syntax=mips:
 
 # TODO: Remove the limit of blcok amount.
-# TODO: Refactor code, remove useless property and clean up dirty word
 
 # Macros {{{
 
@@ -353,6 +352,11 @@
 # }}}
 	
 .text
+    
+# -------------------------------------------
+# -  main: the main entry of breakout game  -
+# -------------------------------------------
+main:
 	# allocate space
 	jal allocMemory
 	
@@ -412,6 +416,9 @@
 	
 # gameCheck {{{
 
+# -------------------------------------
+# -  gameCheck: checking game status. -
+# -------------------------------------
 	gameCheck:
 		fentry($ra)
 		
@@ -462,6 +469,9 @@
 
 # waitNextClock {{{
 
+# -------------------------------------------------------------------------
+# -  waitNextClock: Wait for a frame time, it should be greater than 1ms  -
+# -------------------------------------------------------------------------
 	waitNextClock:
 		fentry($a0,$a1,$ra)
 		
@@ -494,6 +504,9 @@
 	
 # movingEvent {{{
 
+# -----------------------------------------------------
+# -  movingEvent: game procedure, make the ball move  -
+# -----------------------------------------------------
 	movingEvent:
 		moveBall:
 			# move ball every frame
@@ -543,7 +556,9 @@
 	
 # ball speed & direction {{{
 	
-	# Reverse the speed of Y direction
+    # -----------------------------------------------------
+    # -  ballReverseYSpeed: flip ball's y speed direction -
+    # -----------------------------------------------------
 	ballReverseYSpeed:
 		lw $t0, ballSpeedSignY
 		sub $t0, $zero, $t0
@@ -553,8 +568,14 @@
 		
 		jr $ra
 		
-	# $a0, the x direction. 1 move right, -1 move left, 0 no changes
-	# $a1, the y direction. 1 move down, -1 move up, 0 no changes
+    # --------------------------------------------------------------
+    # -  setBallDirection: setting the ball's moving direction     -
+    # -                    $a0: the x direction                    -
+    # -                    $a1: the y direction                    -
+    # -                         1 for right/down direction         -
+    # -                        -1 for left/up direction            -
+    # -                         0 for no changes                   -
+    # --------------------------------------------------------------
 	setBallDirection:
 		
 		setX:
@@ -570,7 +591,9 @@
 			jr $ra
 		
 	
-	# Reverse the speed of X direction
+    # -----------------------------------------------------
+    # -  ballReverseXSpeed: flip ball's x speed direction -
+    # -----------------------------------------------------
 	ballReverseXSpeed:
 		lw $t0, ballSpeedSignX
 		sub $t0, $zero, $t0
@@ -580,7 +603,10 @@
 		
 		jr $ra
 	
-	# $a0: the speed gonna increase	
+    # -----------------------------------------------------------
+    # -  increaseBonusSpeed: increase the bonus speed for ball  -
+    # -                      $a0: the increment for bonus speed -
+    # -----------------------------------------------------------
 	increaseBonusSpeed:
 		lw $t0, ballBonusSpeed
 		add $t0, $t0, $a0
@@ -604,6 +630,10 @@
 		
 		jr $ra
 		
+    # -----------------------------------------------------------------
+    # -  increaseProgressSpeed: increase the progress speed for ball  -
+    # -                         $a0: the increment for progress speed -
+    # -----------------------------------------------------------------
 	increaseProgressSpeed:
 
 		lw $t0, ballProgressSpeed
@@ -614,8 +644,12 @@
 
 		jr $ra
 	
-	# Increase the angle of ball
-	# $a0: the increment angle (degree unit)
+    # ----------------------------------------------------------------------
+    # -  increaseBallAngle: increase ball's angle by $a0                   -
+    # -                     $a0: the increment of ball angle in degree unit-
+    # -                 
+    # -                     Notice the angle will be limit in 25~90        -
+    # ----------------------------------------------------------------------
 	increaseBallAngle:
 		lw $t0, ballAngle
 		add $t0, $a0, $t0
@@ -642,7 +676,9 @@
 		jr $ra
 		
 		
-	# update the ball speed
+    # -------------------------------
+    # -  updateSpeed: update speed  -
+    # -------------------------------
 	updateSpeed:
 		# formula for X speed: speedSign * initialSpeed * cos(angle) * ( 1 + progress_speed / 1024 + bonus_speed / 1024 )
 		# formula for Y speed: speedSign * initialSpeed * sin(angle) * ( 1 + progress_speed / 1024 + bonus_speed / 1024 )
@@ -706,6 +742,9 @@
 	
 # collisionHandler {{{
 
+    # ------------------------------------------------------------------
+    # -  collisionHandler: game procedure for handle object collision  -
+    # ------------------------------------------------------------------
 	collisionHandler:
         fentry($s0,$s1,$ra)
 	
@@ -1152,6 +1191,9 @@
 	
 # render {{{
 
+    # ------------------------------------------------------------------
+    # -  render: game procedure for painting object on bitmap display  -
+    # ------------------------------------------------------------------
 	render:
 		# TODO: Optimize the render process
 		
@@ -1353,7 +1395,7 @@
 			jr $ra
 	
 	# draw Pixel art
-	# $a0, the beginning of pixel art array address, each entry are 3 word long, represent [x,y,color]. The array is null-terminated, means [0,0,0]		
+	# $a0, the beginning of pixel art array address, each entry are 3 word long, represent [x,y,color]. The array is null-terminated
 	drawPixelArt:
 		fentry($a0)
 		
@@ -1394,7 +1436,9 @@
 
 # handleInput {{{
 
-	# handle input
+    # -------------------------------------------------------
+    # -  handleInput: game procedure for handle user input  -
+    # -------------------------------------------------------
 	handleInput:
 		fentry($ra)
 		lw $t1, 0xffff0000
@@ -1545,7 +1589,19 @@
 		
 # drawline {{{
 
-	# This method draw a line between [$a0, $a1) with color $a3 on y $a2
+    # ---------------------------------------------------------------------------------------------------------------------------
+    # -  drawline: draw a line on screen                                                                                        -
+    # -            $a0: the index of first x coordinate                                                                         -
+    # -            $a1: the index of end x coordinate                                                                           -
+    # -            $a2: the index of y coordinate                                                                               -
+    # -            $a2: color                                                                                                   -   
+    # -   global parameter                                                                                                      -
+    # -      drawline_firstPixelPayload : Payload for first pixel                                                               -
+    # -      drawline_middlePixelPayload: Payload for middle pixel                                                              -
+    # -      drawline_lastPixelPayload  : Payload for last pixel                                                                -
+    # -      drawline_targetColor       : Only draw pixel on specific color                                                     -
+    # -      drawline_anyColor          : Draw pixel on any color, this parameter will overwrite rule of targetColor if enabled -
+    # ---------------------------------------------------------------------------------------------------------------------------
 	drawline:
 		fentry($a0,$a1,$a2,$s0)
 		
