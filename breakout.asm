@@ -1,6 +1,17 @@
 # vim:set syntax=mips:
 
-# TODO: Remove the limit of blcok amount.
+# Game Display Setting:
+#   Bitmap Display
+#       Unit Width     : 2
+#       Unit Width     : 2
+#       Display Width  : 512
+#       Display Height : 256
+#       Base Address   : 0x10040000(heap)
+#   Keyboard MMIO
+#       Base Address   : 0xffff0000 (MARS default value
+
+# TODO: Remove the limit of blcok amount
+# TODO: Make panel movement step based on panelWidth
 
 # Macros {{{
 
@@ -198,6 +209,24 @@
 	syscall
 .end_macro
 
+.macro slowHint(%offset)
+	fentry($a0,$v0)
+	la $a0, msg_runningSlow1
+	li $v0, 4
+	syscall
+	fexit($a0,$v0)
+	fentry($a0,$v0)
+	move $a0, %offset
+	li $v0, 1
+	syscall
+	fexit($a0,$v0)
+	fentry($a0,$v0)
+	la $a0, msg_runningSlow2
+	li $v0, 4
+	syscall
+	fexit($a0,$v0)
+.end_macro
+
 # }}}
 
 # Data {{{
@@ -205,9 +234,9 @@
 .data
 	
 	# display related
-	screen_xsize: .word 128
-	screen_ysize: .word 64
-	screen_xbits: .word 7
+	screen_xsize: .word 256
+	screen_ysize: .word 128
+	screen_xbits: .word 8
 	
 	# Game status 
 	gaming: 	  .word 1 		# is the game running? 
@@ -221,25 +250,27 @@
 	totBlocks:    		.word 60
     blockRemaining:	    .word 60
 	blocks: .word  
-      4,  0,16746923, 0, 14,  0,16746955, 0, 24,  0,15960575, 0, 34,  0,11700735, 0, 44,  0, 9019391, 0, 54,  0, 9036031, 0, 64,  0, 9043934, 0, 74,  0, 9043869, 0, 84,  0,11861897, 0, 94,  0,16121737, 0,104,  0,16763273, 0,114,  0,16746889, 0,
-      4,  7,16746923, 0, 14,  7,16746955, 0, 24,  7,15960575, 0, 34,  7,11700735, 0, 44,  7, 9019391, 0, 54,  7, 9036031, 0, 64,  7, 9043934, 0, 74,  7, 9043869, 0, 84,  7,11861897, 0, 94,  7,16121737, 0,104,  7,16763273, 0,114,  7,16746889, 0,
-      4, 14,16746923, 0, 14, 14,16746955, 0, 24, 14,15960575, 0, 34, 14,11700735, 0, 44, 14, 9019391, 0, 54, 14, 9036031, 0, 64, 14, 9043934, 0, 74, 14, 9043869, 0, 84, 14,11861897, 0, 94, 14,16121737, 0,104, 14,16763273, 0,114, 14,16746889, 0,
-      4, 21,16746923, 0, 14, 21,16746955, 0, 24, 21,15960575, 0, 34, 21,11700735, 0, 44, 21, 9019391, 0, 54, 21, 9036031, 0, 64, 21, 9043934, 0, 74, 21, 9043869, 0, 84, 21,11861897, 0, 94, 21,16121737, 0,104, 21,16763273, 0,114, 21,16746889, 0,
-      4, 28,16746923, 0, 14, 28,16746955, 0, 24, 28,15960575, 0, 34, 28,11700735, 0, 44, 28, 9019391, 0, 54, 28, 9036031, 0, 64, 28, 9043934, 0, 74, 28, 9043869, 0, 84, 28,11861897, 0, 94, 28,16121737, 0,104, 28,16763273, 0,114, 28,16746889, 0,
-	block_width:  .word 10
-	block_height: .word 7
+  2,  0,16746923, 0, 23,  0,16746955, 0, 44,  0,15960575, 0, 65,  0,11700735, 0, 86,  0, 9019391, 0,107,  0, 9036031, 0,128,  0, 9043934, 0,149,  0, 9043869, 0,170,  0,11861897, 0,191,  0,16121737, 0,212,  0,16763273, 0,233,  0,16746889, 0,
+  2, 12,16746923, 0, 23, 12,16746955, 0, 44, 12,15960575, 0, 65, 12,11700735, 0, 86, 12, 9019391, 0,107, 12, 9036031, 0,128, 12, 9043934, 0,149, 12, 9043869, 0,170, 12,11861897, 0,191, 12,16121737, 0,212, 12,16763273, 0,233, 12,16746889, 0,
+  2, 24,16746923, 0, 23, 24,16746955, 0, 44, 24,15960575, 0, 65, 24,11700735, 0, 86, 24, 9019391, 0,107, 24, 9036031, 0,128, 24, 9043934, 0,149, 24, 9043869, 0,170, 24,11861897, 0,191, 24,16121737, 0,212, 24,16763273, 0,233, 24,16746889, 0,
+  2, 36,16746923, 0, 23, 36,16746955, 0, 44, 36,15960575, 0, 65, 36,11700735, 0, 86, 36, 9019391, 0,107, 36, 9036031, 0,128, 36, 9043934, 0,149, 36, 9043869, 0,170, 36,11861897, 0,191, 36,16121737, 0,212, 36,16763273, 0,233, 36,16746889, 0,
+  2, 48,16746923, 0, 23, 48,16746955, 0, 44, 48,15960575, 0, 65, 48,11700735, 0, 86, 48, 9019391, 0,107, 48, 9036031, 0,128, 48, 9043934, 0,149, 48, 9043869, 0,170, 48,11861897, 0,191, 48,16121737, 0,212, 48,16763273, 0,233, 48,16746889, 0,
+	block_width:  .word 21
+	block_height: .word 12
 
 	# Game Properties
     ballProgressInc: 		.word  40			# the increment for breaking a block
     ballPushForce: 			.word  200			# the bonus speed for panel pushing
     blockCollisionLRSpeed:  .word  32			# the bonus speed for LR collision
     ballCollideCenter: 		.word -128			# the bonus speed for panel center collision
-	keyLeftMovement:  		.word -6			# left movement distance of panel
-	keyRightMovement: 		.word  6			# right movement distance of panel
+	keyLeftMovement:  		.word -14			# left movement distance of panel
+	keyRightMovement: 		.word  14			# right movement distance of panel
     bonusSpeedMaximum: 		.word  1024			# the maximum value of bonus speed
     bonusSpeedMinimum: 		.word -512			# the minimum value of bonus speed
 
     # Game constant
+    msg_runningSlow1:		.asciiz "[Warning] A significant delay detected, about "
+    msg_runningSlow2:		.asciiz " ms\n"
     blockStatusDestroyed:   .word 0x1
     blockStatusSpecial:		.word 0x2
 	sin_table: .word 
@@ -273,9 +304,9 @@
     collisionPushByPanel: .word 4
     
     # panel
-	panelX: 	.word 58
-	panelY:		.word 59
-	panelWidth: .word 13
+	panelX: 	.word 128
+	panelY:		.word 120
+	panelWidth: .word 37
 	panelMoved: .word 1
 	panelMovement:  .word 0
 	panelColor: .word 0x00ffffff
@@ -284,10 +315,10 @@
     panelLastMoveDir: .word 0			# last direction
 
 	# ball
-	ballX:		.word 63
-	ballY:		.word 55
-	ballWidth:	.word 3
-	ballHeight: .word 3
+	ballX:		.word 144
+	ballY:		.word 115
+	ballWidth:	.word 5
+	ballHeight: .word 5
 	ballMoved:  .word 1
 	ballSpeedX: .word 0             # the value add to XMovement every frame
 	ballSpeedY: .word 0             # the value add to YMovement every frame
@@ -298,9 +329,7 @@
 	ballXMovement: .word 0
 	ballYMovement: .word 0
 	ballFollowPanel:  	.word  1
-	ballFollowOffsetX: 	.word  5
-	ballFollowOffsetY:  .word -5
-    ballInitialSpeed:	.word  35		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSign
+    ballInitialSpeed:	.word  100		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSign
     ballTouchBottomWall: .word 0
     ballSpeedSignX: .word  1
     ballSpeedSignY: .word -1
@@ -320,6 +349,7 @@
 	passedms:   .word 0
 	
 	# pixel art
+	bitmap_scale: .word 2
 	win_bitmap: .word 
             56, 30, 0x422400, 56, 31, 0x643a00, 56, 32, 0x4f2f00, 57, 28, 0x784700, 57, 29, 0x070502, 57, 30, 0x302617, 57, 31, 0x452f03, 57, 32, 0xdbac1a, 57, 33, 0xe1a312, 57, 34, 0x935a01, 
             58, 27, 0x895401, 58, 28, 0xf3c521, 58, 29, 0x2f2e28, 58, 30, 0x2c2c2b, 58, 32, 0x695b12, 58, 33, 0xfbce29, 58, 34, 0xf6ac1b, 58, 35, 0xab6903, 59, 26, 0x372000, 59, 27, 0xecb518, 
@@ -483,7 +513,10 @@ main:
 		beqz $v0, keepWaiting   # keep waiting until at least 1ms passed
 		
 		sw $v0, passedms		# store the millisecond been passed since last waiting.
-		
+		sltiu $t0, $v0, 100		# if the fps is lower than 10, show a warning.
+		bnez $t0, nothing_ok
+			slowHint($v0)
+		nothing_ok:
 		sw $a0, lastms
 		
 		fexit($a0,$a1,$ra)
@@ -1377,6 +1410,7 @@ main:
 			lw $t0, uWin
 			beqz $t0, testWin_end
 			la $a0, win_bitmap
+			lw $a1, bitmap_scale
 			jal drawPixelArt
 		testWin_end:
 			
@@ -1385,6 +1419,7 @@ main:
 			lw $t0, uLose
 			beqz $t0, testLose_end
 			la $a0, lose_bitmap
+			lw $a1, bitmap_scale
 			jal drawPixelArt
 		testLose_end: 
 			
@@ -1396,8 +1431,9 @@ main:
 	
 	# draw Pixel art
 	# $a0, the beginning of pixel art array address, each entry are 3 word long, represent [x,y,color]. The array is null-terminated
+	# $a1, the scale factor of bitmap
 	drawPixelArt:
-		fentry($a0)
+		fentry($a0,$s0,$s1,$a1)
 		
 		keep_drawing_pixelart:
 			lw $t0, 0($a0)
@@ -1414,21 +1450,44 @@ main:
 			add $t4, $t4, $t5
 			beqz $t4, stop_drawing_pixelart 
 			
-			# calcuate byte offset of that pixel
-			lw $t3, screen_xbits
-			sll $t0, $t0, 2
-			sll $t1, $t1, 2
-			sllv $t1, $t1, $t3
-			add $t0, $t0, $t1
+			# scale
+			move $s0, $a1	# x
+			move $s1, $a1	# y
+			mul $t0, $t0, $s0
+			mul $t1, $t1, $s0
 			
-			# store the color
-			sw $t2, 0x10040000($t0)
-			
+			pixel_art_scale_loop1:
+				beqz $s1, pixel_art_scale_loop1_end
+				pixel_art_scale_loop2:
+					beqz $s0, pixel_art_scale_loop2_end
+					# calcuate byte offset of that pixel
+					lw $t3, screen_xbits
+					move $t4, $t0
+					move $t5, $t1
+					add $t4, $t4, $s0
+					add $t5, $t5, $s1
+					sll $t4, $t4, 2
+					sll $t5, $t5, 2
+					sllv $t5, $t5, $t3
+					add $t5, $t5, $t4
+				
+					# store the color
+					sw $t2, 0x10040000($t5)
+															
+					# minus
+					addi $s0, $s0, -1
+					j pixel_art_scale_loop2
+				pixel_art_scale_loop2_end:
+				move $s0, $a1
+				addi $s1, $s1, -1
+				j pixel_art_scale_loop1
+			pixel_art_scale_loop1_end:
+
 			addi $a0, $a0, 12
 			j keep_drawing_pixelart
 		stop_drawing_pixelart:
 		
-		fexit($a0)
+		fexit($a0,$s0,$s1,$a1)
 		jr $ra
 	
 
