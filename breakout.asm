@@ -12,7 +12,6 @@
 
 # TODO: Remove the limit of blcok amount
 # TODO: Make panel movement step based on panelWidth
-# TODO: Detect if the game is running in low speed
 
 # Macros {{{
 
@@ -210,6 +209,24 @@
 	syscall
 .end_macro
 
+.macro slowHint(%offset)
+	fentry($a0,$v0)
+	la $a0, msg_runningSlow1
+	li $v0, 4
+	syscall
+	fexit($a0,$v0)
+	fentry($a0,$v0)
+	move $a0, %offset
+	li $v0, 1
+	syscall
+	fexit($a0,$v0)
+	fentry($a0,$v0)
+	la $a0, msg_runningSlow2
+	li $v0, 4
+	syscall
+	fexit($a0,$v0)
+.end_macro
+
 # }}}
 
 # Data {{{
@@ -225,7 +242,7 @@
 	gaming: 	  .word 1 		# is the game running? 
 	uWin:		  .word 0
 	uLose: 		  .word 0
-	gameCheating: .word 0		# cheating mode
+	gameCheating: .word 1		# cheating mode
     blockCollided: .space 256
     requireSpeedUpdate: .word 0
 
@@ -252,6 +269,8 @@
     bonusSpeedMinimum: 		.word -512			# the minimum value of bonus speed
 
     # Game constant
+    msg_runningSlow1:		.asciiz "[Warning] A significant delay detected, about "
+    msg_runningSlow2:		.asciiz " ms\n"
     blockStatusDestroyed:   .word 0x1
     blockStatusSpecial:		.word 0x2
 	sin_table: .word 
@@ -310,7 +329,7 @@
 	ballXMovement: .word 0
 	ballYMovement: .word 0
 	ballFollowPanel:  	.word  1
-    ballInitialSpeed:	.word  180		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSign
+    ballInitialSpeed:	.word  100		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSign
     ballTouchBottomWall: .word 0
     ballSpeedSignX: .word  1
     ballSpeedSignY: .word -1
@@ -494,7 +513,10 @@ main:
 		beqz $v0, keepWaiting   # keep waiting until at least 1ms passed
 		
 		sw $v0, passedms		# store the millisecond been passed since last waiting.
-		
+		sltiu $t0, $v0, 100		# if the fps is lower than 10, show a warning.
+		bnez $t0, nothing_ok
+			slowHint($v0)
+		nothing_ok:
 		sw $a0, lastms
 		
 		fexit($a0,$a1,$ra)
