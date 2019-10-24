@@ -307,7 +307,7 @@
 	ballXMovement: .word 0
 	ballYMovement: .word 0
 	ballFollowPanel:  	.word  1
-    ballInitialSpeed:	.word  150		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSign
+    ballInitialSpeed:	.word  1000		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSign
     ballTouchBottomWall: .word 0
     ballSpeedSignX: .word  1
     ballSpeedSignY: .word -1
@@ -488,10 +488,11 @@ main:
 		syscall					# now current ms been store in $a0
 		lw $a1, lastms 			# load lastms into $a1
 		jal diff 				# call it motherfucker
-		beqz $v0, keepWaiting   # keep waiting until at least 1ms passed
+		sltiu $t0, $v0, 20		
+		bnez $t0, keepWaiting   # keep waiting until at least 1ms passed
 		
 		sw $v0, passedms		# store the millisecond been passed since last waiting.
-		sltiu $t0, $v0, 100		# if the fps is lower than 10, show a warning.
+		sltiu $t0, $v0, 30		# if the fps is lower than 10, show a warning.
 		bnez $t0, nothing_ok
 			slowHint($v0)
 		nothing_ok:
@@ -850,7 +851,6 @@ main:
                         beqz $t4, continue_scanning666			# if there is nothing, scan next pixel 
                         
                         srl $t4, $t4, 24        # $t4 = payload of specific pixel
-						andi $a0, $t4, 0x3f		# object id
 						andi $a0, $t4, 0xff		# object id
 						# if the object already collided, don't do that again
 						sll $t8, $a0, 2
