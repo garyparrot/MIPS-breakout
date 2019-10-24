@@ -691,14 +691,14 @@ main:
 		li $t1, 90
 		bgt $t0, $t1, toomuch
 		li $t1, 25
-		blt $t0, $t5, tooless
+		blt $t0, $t1, tooless
 		j nothing_you
 
 		toomuch:
 			li $t0, 90
 			j nothing_you
 		tooless:
-			li $t0, 0
+			li $t0, 25
 			j nothing_you
 		nothing_you:
 
