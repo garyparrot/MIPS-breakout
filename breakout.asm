@@ -10,7 +10,7 @@
 #   Keyboard MMIO
 #       Base Address   : 0xffff0000 (MARS default value
 
-# TODO: Remove the limit of blcok amount
+# TODO: Stable Game clock
 # TODO: Make panel movement step based on panelWidth
 
 # Macros {{{
@@ -95,31 +95,6 @@
 	li $v0, 11
 	syscall
 	fexit($a0,$v0)
-.end_macro
-
-.macro setFirstPixelPayload(%id, %direction)
-	fentry($t7)
-	lw $t7, %direction
-	sll $t7, $t7, 6
-	or $t7, $t7, %id
-	sw $t7, drawline_firstPixelPayload
-	fexit($t7)
-.end_macro
-.macro setMiddlePixelPayload(%id, %direction)
-	fentry($t7)
-	lw $t7, %direction
-	sll $t7, $t7, 6
-	or $t7, $t7, %id
-	sw $t7, drawline_middlePixelPayload
-	fexit($t7)
-.end_macro
-.macro setLastPixelPayload(%id, %direction)
-	fentry($t7)
-	lw $t7, %direction
-	sll $t7, $t7, 6
-	or $t7, $t7, %id
-	sw $t7, drawline_lastPixelPayload
-	fexit($t7)
 .end_macro
 
 .macro maxdiff(%a0,%a1,%a2,%a3,%res)
@@ -243,20 +218,23 @@
 	uWin:		  .word 0
 	uLose: 		  .word 0
 	gameCheating: .word 1		# cheating mode
-    blockCollided: .space 256
+    blockCollided: .space 1024
     requireSpeedUpdate: .word 0
 
 	# Blocks
-	totBlocks:    		.word 60
-    blockRemaining:	    .word 60
+	totBlocks:    		.word 45
+    blockRemaining:	    .word 45
 	blocks: .word  
-  2,  0,16746923, 0, 23,  0,16746955, 0, 44,  0,15960575, 0, 65,  0,11700735, 0, 86,  0, 9019391, 0,107,  0, 9036031, 0,128,  0, 9043934, 0,149,  0, 9043869, 0,170,  0,11861897, 0,191,  0,16121737, 0,212,  0,16763273, 0,233,  0,16746889, 0,
-  2, 12,16746923, 0, 23, 12,16746955, 0, 44, 12,15960575, 0, 65, 12,11700735, 0, 86, 12, 9019391, 0,107, 12, 9036031, 0,128, 12, 9043934, 0,149, 12, 9043869, 0,170, 12,11861897, 0,191, 12,16121737, 0,212, 12,16763273, 0,233, 12,16746889, 0,
-  2, 24,16746923, 0, 23, 24,16746955, 0, 44, 24,15960575, 0, 65, 24,11700735, 0, 86, 24, 9019391, 0,107, 24, 9036031, 0,128, 24, 9043934, 0,149, 24, 9043869, 0,170, 24,11861897, 0,191, 24,16121737, 0,212, 24,16763273, 0,233, 24,16746889, 0,
-  2, 36,16746923, 0, 23, 36,16746955, 0, 44, 36,15960575, 0, 65, 36,11700735, 0, 86, 36, 9019391, 0,107, 36, 9036031, 0,128, 36, 9043934, 0,149, 36, 9043869, 0,170, 36,11861897, 0,191, 36,16121737, 0,212, 36,16763273, 0,233, 36,16746889, 0,
-  2, 48,16746923, 0, 23, 48,16746955, 0, 44, 48,15960575, 0, 65, 48,11700735, 0, 86, 48, 9019391, 0,107, 48, 9036031, 0,128, 48, 9043934, 0,149, 48, 9043869, 0,170, 48,11861897, 0,191, 48,16121737, 0,212, 48,16763273, 0,233, 48,16746889, 0,
-	block_width:  .word 21
-	block_height: .word 12
+	 17,  0,16726342, 0, 51,  0,16726342, 0, 85,  0,16726342, 0,119,  0,16726342, 0,153,  0,16726342, 0,187,  0,16726342, 0,221,  0,16726342, 0,
+	  0, 10,16734826, 0, 34, 10,16734826, 0, 68, 10,16734826, 0,102, 10,16734826, 0,136, 10,16734826, 0,170, 10,16734826, 0,204, 10,16734826, 0,238, 10,16734826, 0,
+	 17, 20,16734826, 0, 51, 20,16734826, 0, 85, 20,16734826, 0,119, 20,0xff0004, 2,153, 20,16734826, 0,187, 20,16734826, 0,221, 20,16734826, 0,
+	  0, 30,16740995, 0, 34, 30,16740995, 0, 68, 30,16740995, 0,102, 30,16740995, 0,136, 30,16740995, 0,170, 30,16740995, 0,204, 30,16740995, 0,238, 30,16740995, 0,
+	 17, 40,16745109, 0, 51, 40,16745109, 0, 85, 40,16745109, 0,119, 40,16745109, 0,153, 40,16745109, 0,187, 40,16745109, 0,221, 40,16745109, 0,
+	  0, 50,16747937, 0, 34, 50,16747937, 0, 68, 50,16747937, 0,102, 50,16747937, 0,136, 50,16747937, 0,170, 50,16747937, 0,204, 50,16747937, 0,238, 50,16747937, 0,
+
+	block_width:  .word 17
+	block_height: .word 10
+
 
 	# Game Properties
     ballProgressInc: 		.word  40			# the increment for breaking a block
@@ -310,7 +288,7 @@
 	panelMoved: .word 1
 	panelMovement:  .word 0
 	panelColor: .word 0x00ffffff
-	panelObjectId: .word 63
+	panelObjectId: .word 255
 	panelStretch: .word 0
     panelLastMoveDir: .word 0			# last direction
 
@@ -329,7 +307,7 @@
 	ballXMovement: .word 0
 	ballYMovement: .word 0
 	ballFollowPanel:  	.word  1
-    ballInitialSpeed:	.word  100		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSign
+    ballInitialSpeed:	.word  1000		# warning: this value should be postive, if you want to change direction on start up, consult ballSpeedSign
     ballTouchBottomWall: .word 0
     ballSpeedSignX: .word  1
     ballSpeedSignY: .word -1
@@ -510,10 +488,11 @@ main:
 		syscall					# now current ms been store in $a0
 		lw $a1, lastms 			# load lastms into $a1
 		jal diff 				# call it motherfucker
-		beqz $v0, keepWaiting   # keep waiting until at least 1ms passed
+		sltiu $t0, $v0, 20		
+		bnez $t0, keepWaiting   # keep waiting until at least 1ms passed
 		
 		sw $v0, passedms		# store the millisecond been passed since last waiting.
-		sltiu $t0, $v0, 100		# if the fps is lower than 10, show a warning.
+		sltiu $t0, $v0, 30		# if the fps is lower than 10, show a warning.
 		bnez $t0, nothing_ok
 			slowHint($v0)
 		nothing_ok:
@@ -691,14 +670,14 @@ main:
 		li $t1, 90
 		bgt $t0, $t1, toomuch
 		li $t1, 25
-		blt $t0, $t5, tooless
+		blt $t0, $t1, tooless
 		j nothing_you
 
 		toomuch:
 			li $t0, 90
 			j nothing_you
 		tooless:
-			li $t0, 0
+			li $t0, 25
 			j nothing_you
 		nothing_you:
 
@@ -848,7 +827,7 @@ main:
             lw $s3, ballHeight          # $s3 = remaining height
             
             # clear collided tag
-            li $t0, 64
+            li $t0, 256
             li $t1, 0
             keep_do_it_LOL:
             	sw $zero, blockCollided($t1)
@@ -872,10 +851,7 @@ main:
                         beqz $t4, continue_scanning666			# if there is nothing, scan next pixel 
                         
                         srl $t4, $t4, 24        # $t4 = payload of specific pixel
-						andi $a0, $t4, 0x3f		# object id
-						andi $a1, $t4, 0xc0		
-						srl  $a1, $a1, 6		# collision direction
-						
+						andi $a0, $t4, 0xff		# object id
 						# if the object already collided, don't do that again
 						sll $t8, $a0, 2
 						lw $t8, blockCollided($t8)
@@ -892,9 +868,6 @@ main:
 							syscall
 							li $a0, ' '
 							li $v0, 11
-							syscall
-							add $a0, $a1, $zero
-							li $v0, 1
 							syscall
 							li $a0, '\n'
 							li $v0, 11
@@ -922,7 +895,7 @@ main:
 		
 	# Once collision happened, this subroutin get called
 	# $a0: the id of object who collide with ball
-	# $a1: the direction code 
+	# $a1: (deprecated) the direction code, this arguement already deprecated, this argument it doesn't affect anything.
 	# $a2: shall this collision event trigger movement chages
 	#	   in order to prevent bug caused by collide with multiple instance
 	#	   movement change should occur once a frame
@@ -930,10 +903,7 @@ main:
 		fentry($ra,$s0,$s1,$s2)
 		fentry($s3)
 		
-		# if target is a CR collision
-		# Test if this is a real corner collision or not
-		lw $t0, collisionCR
-		bne $a1, $t0, next_collision_0
+		# Test the collision direction, there is three possible value, LF(Left-Right), TB(Top-Bottom), CR(Corner)
 			jal getObjectLR
 			addi $t0, $v0, 0		# $t0 = object left
 			addi $t1, $v1, 0		# $t1 = object right
@@ -970,15 +940,8 @@ main:
 			li $t0, 1	# LR
 			li $t1, 2	# TB
 			li $t2, 0	# CR
-			li $t3, 3	# if the object id is 63, the ball must be hit by panel
+			li $t3, 3	# if the object id is 255, the ball must be hit by panel
 		
-			nop
-			nop
-			nop
-			nop
-			nop
-			nop
-			
 			beq $t0, $s0, set_as_LR
 			beq $t1, $s0, set_as_TB
 			beq $t2, $s0, be_yourself_CR
@@ -1380,16 +1343,10 @@ main:
 			jal drawline
 			
 			# draw it with movement
-			lw $t0, collisionCR
-			lw $t1, collisionCR
-			sll $t0, $t0, 6
-			sll $t1, $t1, 6
 			lw $t2, panelObjectId
-			or $t0, $t0, $t2
-			or $t1, $t1, $t2
-			sw $t0, drawline_firstPixelPayload
-			sw $t0, drawline_lastPixelPayload
-			sw $t1, drawline_middlePixelPayload
+			sw $t2, drawline_firstPixelPayload
+			sw $t2, drawline_lastPixelPayload
+			sw $t2, drawline_middlePixelPayload
 			
 			lw $t0, panelMovement
 			add $a0, $a0, $t0		# begin of drawing
@@ -1589,9 +1546,9 @@ main:
 		
 		beqz $s6, end_if_0000
 			li $s2, 0				# no color
-			setFirstPixelPayload ($zero, collisionNP)
-			setMiddlePixelPayload($zero, collisionNP)
-			setLastPixelPayload  ($zero, collisionNP)
+			sw $zero, drawline_firstPixelPayload
+			sw $zero, drawline_middlePixelPayload
+			sw $zero, drawline_lastPixelPayload
 		end_if_0000:
 		
 		# raindrop, draw top
@@ -1600,9 +1557,9 @@ main:
 		add $a2, $s1, $zero
 		add $a3, $s2, $zero
 		bnez $s6, end_if_0001
-			setFirstPixelPayload ($s7, collisionCR)
-			setMiddlePixelPayload($s7, collisionTB)
-			setLastPixelPayload  ($s7, collisionCR)
+			sw $s7, drawline_firstPixelPayload
+			sw $s7, drawline_middlePixelPayload
+			sw $s7, drawline_lastPixelPayload
 		end_if_0001:
 		jal drawline
 		
@@ -1617,9 +1574,9 @@ main:
 			add $a2, $s1, $zero
 			add $a3, $s2, $zero
 			bnez $s6, end_if_0002
-				setFirstPixelPayload ($s7, collisionLR)
-				setMiddlePixelPayload($s7, collisionNP)
-				setLastPixelPayload  ($s7, collisionLR)
+				sw $s7, drawline_firstPixelPayload
+				sw $s7, drawline_middlePixelPayload
+				sw $s7, drawline_lastPixelPayload
 			end_if_0002:
 			jal drawline
 			addi $s1, $s1, 1
@@ -1632,9 +1589,9 @@ main:
 		add $a2, $s1, $zero
 		add $a3, $s2, $zero
 		bnez $s6, end_if_0003
-			setFirstPixelPayload ($s7, collisionCR)
-			setMiddlePixelPayload($s7, collisionTB)
-			setLastPixelPayload  ($s7, collisionCR)
+			sw $s7, drawline_firstPixelPayload
+			sw $s7, drawline_middlePixelPayload
+			sw $s7, drawline_lastPixelPayload
 		end_if_0003:
 		jal drawline
 
