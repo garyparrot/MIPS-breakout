@@ -957,6 +957,7 @@ main:
 				lw $a1, collisionPushByPanel
 				j finally_done
 			be_yourself_CR:
+				lw $a1, collisionCR
 				j finally_done
 			
 			finally_done:
