@@ -217,7 +217,7 @@
 	gaming: 	  .word 1 		# is the game running? 
 	uWin:		  .word 0
 	uLose: 		  .word 0
-	gameCheating: .word 1		# cheating mode
+	gameCheating: .word 0		# cheating mode
     blockCollided: .space 1024
     requireSpeedUpdate: .word 0
 
@@ -667,14 +667,14 @@ main:
 		add $t0, $a0, $t0
 
 		# test if the value exceed 90 or less than 0
-		li $t1, 90
+		li $t1, 75
 		bgt $t0, $t1, toomuch
 		li $t1, 25
 		blt $t0, $t1, tooless
 		j nothing_you
 
 		toomuch:
-			li $t0, 90
+			li $t0, 75
 			j nothing_you
 		tooless:
 			li $t0, 25
