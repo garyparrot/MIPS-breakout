@@ -835,8 +835,8 @@ main:
             	subi $t0, $t0, 1
             	bnez $t0, keep_do_it_LOL
             
-            li $a2, 1		# allow movement change at the first collision
-            
+            li $a2, 0x3		# collision mask
+          	
             loop_rows:
                 beqz $s3, loop_rows_end         # no more height for scanning
 	            lw $t8, screen_xbits
@@ -872,9 +872,6 @@ main:
 							li $a0, '\n'
 							li $v0, 11
 							syscall
-							
-							li $a2, 0		# disable movement change for later collision event
-							
 						
 						continue_scanning666:
                         subi $s2, $s2, 1
@@ -896,9 +893,9 @@ main:
 	# Once collision happened, this subroutin get called
 	# $a0: the id of object who collide with ball
 	# $a1: (deprecated) the direction code, this arguement already deprecated, this argument it doesn't affect anything.
-	# $a2: shall this collision event trigger movement chages
+	# $a2: Collision mask, shall this collision event trigger movement chages
 	#	   in order to prevent bug caused by collide with multiple instance
-	#	   movement change should occur once a frame
+	#	   movement change should occur only once a direction(TB,LR,CR,PUSH)
 	collision_event:
 		fentry($ra,$s0,$s1,$s2)
 		fentry($s3)
@@ -982,12 +979,20 @@ main:
 				fexit($a0)
 				
 				# change ball direction based on the pushing direction
+						
 				fentry($a0, $a1)
-					lw $a0, panelLastMoveDir
-					li $a1, -1
+					and  $t0, $a2, 0x01
+					beqz $t0, end_testx
+						lw $a0, panelLastMoveDir
+					end_testx:
+					and  $t0, $a2, 0x02
+					beqz $t0, end_testy
+						li $a1, -1
+					end_testy:
 					
-					beqz $a2, ok_nothing
 					jal setBallDirection
+					
+					li $a2, 0
 				fexit($a0,$a1)
 				
 
@@ -1024,8 +1029,9 @@ main:
 			ok_nothing2:
 				
 				# Change the movement of ball based on collision info
-				beqz $a2, next_collision_1
+				
 				jal collision_change_ball_movement
+
 		
 		# test block collision
 		next_collision_1:
@@ -1057,7 +1063,6 @@ main:
 			
 			setStatusDestoryed($a0)
 			
-			beqz $a2, next_collision_2
 			jal collision_change_ball_movement
 			
 		next_collision_2:
@@ -1106,6 +1111,8 @@ main:
 	# Change ball movement based on collision direction code
 	# $a0: the object id 
 	# $a1: the direction code
+	# $a2: collision direction flag, if bit0 not setted, x-dir reverse is forbidden.
+	#								 if bit1 not setted, y-dir reverse is forbidden.
 	collision_change_ball_movement:
 		fentry($ra,$a0,$a1)
 		lw $t0, collisionLR
@@ -1119,19 +1126,34 @@ main:
 		collisionCR_movement:
 			sw $zero, ballXMovement
 			sw $zero, ballYMovement
-			jal ballReverseXSpeed
-			jal ballReverseYSpeed
+			andi $t0, $a2, 0x1
+			beqz $t0, jjj1
+				jal ballReverseXSpeed
+			jjj1:
+			andi $t0, $a2, 0x2
+			beqz $t0, jjj2
+				jal ballReverseYSpeed
+			jjj2:
+			li $a2, 0
 			j collisionMovement_end
 		
 		collisionLR_movement:
 			sw $zero, ballXMovement
 			sw $zero, ballYMovement
-			jal ballReverseXSpeed
+			andi $t0, $a2, 0x1
+			beqz $t0, jjj3
+				jal ballReverseXSpeed
+			jjj3:
+			andi $a2, $a2, 0x2
 			j collisionMovement_end
 		collisionTB_movement:
 			sw $zero, ballXMovement
 			sw $zero, ballYMovement
-			jal ballReverseYSpeed
+			andi $t0, $a2, 0x2
+			beqz $t0, jjj4
+				jal ballReverseYSpeed
+			jjj4:
+			andi $a2, $a2, 0x1
 			
 		collisionMovement_end:
 		
