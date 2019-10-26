@@ -276,7 +276,7 @@
     collisionLR: .word 2
     collisionTB: .word 1
     collisionNP: .word 0
-    collisionPushByPanel: .word 4
+    collisionIntersection: .word 4
     
     # wall
     wallTopObjectId: 	.word 254
@@ -364,9 +364,7 @@
 	
 .text
     
-# 1 TODO: refactor code to the right place
 # 3 TODO: setting a speed upperbound
-# 4 TODO: Comment up stuff   
    
 # -------------------------------------------
 # -  main: the main entry of breakout game  -
@@ -678,14 +676,14 @@ main:
     # ----------------------------------------------------------------------
     # -  increaseBallAngle: increase ball's angle by $a0                   -
     # -                     $a0: the increment of ball angle in degree unit-
-    # -                 
+    # -                                                                    -
     # -                     Notice the angle will be limit in 25~90        -
     # ----------------------------------------------------------------------
 	increaseBallAngle:
 		lw $t0, ballAngle
 		add $t0, $a0, $t0
 
-		# test if the value exceed 90 or less than 0
+		# test if the value exceed 75 or less than 25
 		li $t1, 75
 		bgt $t0, $t1, toomuch
 		li $t1, 25
@@ -726,19 +724,20 @@ main:
 		li $t2, 1024
 		add $t0, $t0, $t1
 		add $t0, $t0, $t2		# $t0 = ( 1024 + bonus_speed + progress_speed )
-		mtc1 $s0, $f0			# load everything into coprocesss1 registers
-		mtc1 $t0, $f1
-		mtc1 $t2, $f2
-		lwc1 $f3, cos_table($s1)
-		cvt.s.w $f0, $f0		# convert them into single floating point value
-		cvt.s.w $f1, $f1
-		cvt.s.w $f2, $f2
+		mtc1 $s0, $f0			# load everything into coprocess1 register
+		mtc1 $t0, $f1			# load everything into coprocess1 register
+		mtc1 $t2, $f2			# load everything into coprocess1 register
+		lwc1 $f3, cos_table($s1)# load cos angle  into coprocess1 register
+		cvt.s.w $f0, $f0		# convert them from integer into single floating point value
+		cvt.s.w $f1, $f1		# convert them from integer into single floating point value
+		cvt.s.w $f2, $f2		# convert them from integer into single floating point value
 		div.s $f1, $f1, $f2		# $f1 = ( 1024 + bonus_speed + progress_speed )  / 1024
 		mul.s $f0, $f0, $f1
 		mul.s $f0, $f0, $f3		# $f1 = $f1 * cos(angle)
 		cvt.w.s $f0, $f0
-		mfc1 $s0, $f0			# get the speed
+		mfc1 $s0, $f0			# get the x speed
 		
+		# store result
 		lw $t1, ballSpeedSignX
 		mul $s0, $s0, $t1
 		sw $s0, ballSpeedX
@@ -749,19 +748,20 @@ main:
 		li $t2, 1024
 		add $t0, $t0, $t1
 		add $t0, $t0, $t2		# $t0 = ( 1024 + bonus_speed + progress_speed )
-		mtc1 $s0, $f0			# load everything into coprocesss1 registers
-		mtc1 $t0, $f1
-		mtc1 $t2, $f2
-		lwc1 $f3, sin_table($s1)
-		cvt.s.w $f0, $f0		# convert them into single floating point value
-		cvt.s.w $f1, $f1
-		cvt.s.w $f2, $f2
+		mtc1 $s0, $f0			# load everything into coprocess1 register
+		mtc1 $t0, $f1			# load everything into coprocess1 register
+		mtc1 $t2, $f2			# load everything into coprocess1 register
+		lwc1 $f3, sin_table($s1)# load sin angle  into coprocess1 register
+		cvt.s.w $f0, $f0		# convert them from integer into single floating point value
+		cvt.s.w $f1, $f1		# convert them from integer into single floating point value
+		cvt.s.w $f2, $f2		# convert them from integer into single floating point value
 		div.s $f1, $f1, $f2		# $f1 = ( 1024 + bonus_speed + progress_speed )  / 1024
 		mul.s $f0, $f0, $f1
 		mul.s $f0, $f0, $f3		# $f1 = $f1 * sin(angle)
 		cvt.w.s $f0, $f0
-		mfc1 $s0, $f0			# get the speed
+		mfc1 $s0, $f0			# get the y speed
 		
+		# store result
 		lw $t1, ballSpeedSignY
 		mul $s0, $s0, $t1
 		sw $s0, ballSpeedY
@@ -773,26 +773,27 @@ main:
 	
 # collisionHandler {{{
 
-    # ------------------------------------------------------------------
-    # -  collisionHandler: game procedure for handle object collision  -
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------------
+    # -  collisionHandler: Game procedure for handle object collision               -
+    # - 			       Collision handler specialize in detecting collision      -
+    # -                    Once A collison is detected, a collision_event triggered -
+    # -------------------------------------------------------------------------------
 	collisionHandler:
         fentry($s0,$s1,$ra)
 	
-		handleBall:
-
+		handleWall:
+			# Collision Between ball and Wall
             lw $t0, ballX
             lw $t2, ballXMovement
             lw $t1, ballY
             lw $t3, ballYMovement
-            add $s0, $t0, $t2 	# the ball left x position of next frame
-            add $s1, $t1, $t3	# the ball top  y position of next frame
+            add $s0, $t0, $t2 	# the ball's left x position of next frame
+            add $s1, $t1, $t3	# the ball's top  y position of next frame
             lw $t4, ballWidth
             lw $t5, ballHeight
-            add $s2, $s0, $t4	# the ball right x position of next frame
-            add $s3, $s1, $t5	# the ball bottom y position of next frame
+            add $s2, $s0, $t4	# the ball's right  x position of next frame
+            add $s3, $s1, $t5	# the ball's bottom y position of next frame
 
-            
 			slti $t0, $s0, 0
 			bnez $t0, on_leftWallCollision		# test if ball collide with left wall
 			
@@ -893,6 +894,9 @@ main:
 							li $a0, ' '
 							li $v0, 11
 							syscall
+							move $a0, $a2
+							li $v0, 1
+							syscall
 							li $a0, '\n'
 							li $v0, 11
 							syscall
@@ -941,23 +945,31 @@ main:
 				jal ballReverseYSpeed
 				li $t0, 1
 				sw $t0, ballTouchBottomWall
+				sw $zero, ballXMovement
+				sw $zero, ballYMovement
 				j collision_event_end
 			
 			c_wallTop:
 				jal ballReverseYSpeed
+				sw $zero, ballXMovement
+				sw $zero, ballYMovement
 				j collision_event_end
 			
 			c_wallLeft:
 				jal ballReverseXSpeed
+				sw $zero, ballXMovement
+				sw $zero, ballYMovement
 				j collision_event_end
 			
 			c_wallRight:
 				jal ballReverseXSpeed
+				sw $zero, ballXMovement
+				sw $zero, ballYMovement
 				j collision_event_end
 		
 		collision_event_wall_end:
 		
-		collision_event_panel_and_blocks:
+		finding_collision_direction:
 			# Test the collision direction, there is three possible value, LF(Left-Right), TB(Top-Bottom), CR(Corner)
 			jal getObjectLR
 			addi $t0, $v0, 0		# $t0 = object left
@@ -992,59 +1004,60 @@ main:
 			sll $s0, $s0, 1
 			or $s0, $s0, $s1		# now $s0 is a two bit value, first bit for y and second bit for x
 			
+			li $t2, 0	# CR
 			li $t0, 1	# LR
 			li $t1, 2	# TB
-			li $t2, 0	# CR
-			li $t3, 3	# if the object id is 255, the ball must be hit by panel
+			li $t3, 3	# Intersection. If the object id is 255, the ball must be hit by panel
 		
 			beq $t0, $s0, set_as_LR
 			beq $t1, $s0, set_as_TB
-			beq $t2, $s0, be_yourself_CR
-			beq $t3, $s0, push
+			beq $t2, $s0, set_as_CR
+			beq $t3, $s0, intersection
 			
 			set_as_LR:
 				lw $a1, collisionLR
-				j finally_done
+				j finding_collision_direction_end
 			set_as_TB:
 				lw $a1, collisionTB
-				j finally_done
-			push:
-				lw $a1, collisionPushByPanel
-				j finally_done
-			be_yourself_CR:
+				j finding_collision_direction_end
+			 set_as_CR:
 				lw $a1, collisionCR
-				j finally_done
+				j finding_collision_direction_end
+			intersection:
+				lw $a1, collisionIntersection
+				j finding_collision_direction_end
 			
-			finally_done:
+		finding_collision_direction_end:
 			
 		# test panel collision
-		next_collision_0:
-			lw $t0, panelObjectId
-			bne $t0, $a0, next_collision_1
+		collision_event_panel_intersection:
 			
-			lw $t1, collisionPushByPanel
-			bne $t1, $a1, ok_nothing
+			lw $t0, panelObjectId
+			bne $t0, $a0, collision_event_panel_end 		# if the collided object is panel, continue
+			
+			lw $t1, collisionIntersection
+			bne $t1, $a1, collisoin_panel					# if the collision type is Intersection, continue
+			
 			pushByPanel:
 				lw $t0, ballHeight
 				sub $t0, $zero, $t0
 				sw $t0, ballYMovement
 				sw $t0, ballMoved
 
+				# increase speed due to pushing
 				fentry($a0)
-					# increase speed due to pushing
 					lw $a0, ballPushForce
 					jal increaseBonusSpeed
 				fexit($a0)
 				
 				# change ball direction based on the pushing direction
-						
 				fentry($a0, $a1)
 					and  $t0, $a2, 0x01
-					beqz $t0, end_testx
+					beqz $t0, end_testx 			# test if we can reverse x direction
 						lw $a0, panelLastMoveDir
 					end_testx:
 					and  $t0, $a2, 0x02
-					beqz $t0, end_testy
+					beqz $t0, end_testy				# test if we can reverse y direction
 						li $a1, -1
 					end_testy:
 					
@@ -1053,12 +1066,12 @@ main:
 					li $a2, 0
 				fexit($a0,$a1)
 				
-
-				
-				j next_collision_1
+				# Ok That's it
+				j collision_event_end
 						
-			ok_nothing:
+			collision_panel_intersection_end:
 			
+			collisoin_panel:
 				# Test if the ball hitting the center of panel
 				# Center area will be half of the panel, and locate in the middle of panel.
 				# if the bottom center spot of ball intersect with the center area, we call this center collision
@@ -1077,25 +1090,25 @@ main:
 				lw $t1, panelWidth
 				srl $t1, $t1, 1
 				slt $t0, $t0, $t1		# test if the ball hitting the center area
-				beqz $t0, ok_nothing2
+				beqz $t0, collisoin_panel_end
 				
-					fentry($a0)
-						lw $a0, ballCollideCenter
-						jal increaseBonusSpeed
-					fexit($a0)
+				fentry($a0)
+					lw $a0, ballCollideCenter
+					jal increaseBonusSpeed
+				fexit($a0)
 			
-			ok_nothing2:
+			collisoin_panel_end:
 				
 				# Change the movement of ball based on collision info
-				
 				jal collision_change_ball_movement
 
+		collision_event_panel_end:
 		
 		# test block collision
-		next_collision_1:
+		collision_event_blocks:
 			lw $t0, totBlocks
 			slt $t1, $a0, $t0
-			beqz $t1, next_collision_2
+			beqz $t1, collision_event_blocks_end	# test if the given object id is a block
 			
 			fentry($a0)
 				# increase progress speed because this block been destroyed
@@ -1119,11 +1132,12 @@ main:
 				sw $t0, panelStretch
 			you_are_mediocre:
 			
+			# Mark the given block as destoryed.
 			setStatusDestoryed($a0)
 			
 			jal collision_change_ball_movement
 			
-		next_collision_2:
+		collision_event_blocks_end:
 		
 		collision_event_end:
 		
@@ -1187,11 +1201,11 @@ main:
 			sw $zero, ballXMovement
 			sw $zero, ballYMovement
 			andi $t0, $a2, 0x1
-			beqz $t0, jjj1
+			beqz $t0, jjj1				# test if we can reverse x speed
 				jal ballReverseXSpeed
 			jjj1:
 			andi $t0, $a2, 0x2
-			beqz $t0, jjj2
+			beqz $t0, jjj2				# test if we can reverse y speed
 				jal ballReverseYSpeed
 			jjj2:
 			li $a2, 0
@@ -1201,7 +1215,7 @@ main:
 			sw $zero, ballXMovement
 			sw $zero, ballYMovement
 			andi $t0, $a2, 0x1
-			beqz $t0, jjj3
+			beqz $t0, jjj3				# test if we can reverse x speed
 				jal ballReverseXSpeed
 			jjj3:
 			andi $a2, $a2, 0x2
@@ -1210,7 +1224,7 @@ main:
 			sw $zero, ballXMovement
 			sw $zero, ballYMovement
 			andi $t0, $a2, 0x2
-			beqz $t0, jjj4
+			beqz $t0, jjj4				# test if we can reverse y speed
 				jal ballReverseYSpeed
 			jjj4:
 			andi $a2, $a2, 0x1
@@ -1274,12 +1288,10 @@ main:
     # -  render: game procedure for painting object on bitmap display  -
     # ------------------------------------------------------------------
 	render:
-		# TODO: Optimize the render process
+		fentry($ra)
 		
-		addi $sp, $sp, -4
-		sw $ra, 0($sp)
-			
 		testBlocks:
+			# test if any block been destroyed
 			li $s0, 0
 			lw $s1, totBlocks
 				loop_blockDestoryed_check:
@@ -1288,7 +1300,7 @@ main:
 				getStatus($s0, $t0)				# retrieve the state of specific block
 				lw $t1, blockStatusDestroyed
 				and $t0, $t0, $t1
-					beqz $t0, continue_aaa	# test if the block has been destoryed
+					beqz $t0, next_block		# test if the block has been destoryed
 					
 					# if so, remove block from bitmap
 					add $a0, $s0, $zero
@@ -1302,15 +1314,14 @@ main:
 					sll $t0, $s0, 4
 					sw $zero, blocks+12($t0)	# clear status
 					
-					continue_aaa:				# end of if
+					next_block:					# end of if
 				addi $s0, $s0, 1
 				j loop_blockDestoryed_check
 				
 				loop_blockDestoryed_check_end:
 			
-			
 		testBall:
-			
+			# Move the ball based on Movement
 			lw $t0, ballMoved
 			beqz $t0, testBall_end	
 			
@@ -1410,6 +1421,7 @@ main:
 		testBall_end:
 			
 		testPanel:
+			# Test if we need to redraw panel
 			lw $t0, panelMoved
 			beqz $t0, testPanel_end	# test if panel moved
 			sw $zero, panelMoved	# reset flag
@@ -1446,6 +1458,7 @@ main:
 			sw $zero, panelMovement
 		testPanel_end:
 			
+		# Test if you win the game
 		testWin:
 			lw $t0, uWin
 			beqz $t0, testWin_end
@@ -1454,7 +1467,7 @@ main:
 			jal drawPixelArt
 		testWin_end:
 			
-			
+		# Test if you lose the game
 		testLose:	
 			lw $t0, uLose
 			beqz $t0, testLose_end
@@ -1463,10 +1476,8 @@ main:
 			jal drawPixelArt
 		testLose_end: 
 			
-			
 		on_exit:
-			lw $ra, 0($sp)
-			add $sp, $sp, 4
+			fexit($ra)
 			jr $ra
 	
 	# draw Pixel art
