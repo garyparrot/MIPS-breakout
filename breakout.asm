@@ -10,9 +10,6 @@
 #   Keyboard MMIO
 #       Base Address   : 0xffff0000 (MARS default value
 
-# TODO: Stable Game clock
-# TODO: Make panel movement step based on panelWidth
-
 # Macros {{{
 
 .macro fentry(%a)
@@ -365,36 +362,10 @@
 # -  main: the main entry of breakout game  -
 # -------------------------------------------
 main:
-	# allocate space
-	jal allocMemory
-	
-	# Clean screen on start up
-	li $t0, 0
-	lw $t1, screen_ysize
-	lw $t2, screen_xbits
-	sll $t1, $t1, 2
-	sllv $t1, $t1, $t2
-	clearScreen:
-		sw $zero, 0x10040000($t0)
-		addi $t0, $t0, 4
-		bne $t0, $t1, clearScreen
-	
-	# init Blocks
-	li $s0, 0
-	lw $s1, totBlocks
-	drawBlocksloop:
-		drawBlockR($s0)
-		addi $s0, $s0, 1
-		bne $s0, $s1, drawBlocksloop
-	drawBlocksloopExit:
-	
-	# init system time
-	li $v0, 30			# retrieve system time in ms unit
-	syscall
-	sw $a0, lastms 		# store the lower 32 bit time to lastms
+
+	jal initialization
 			
 	# Game loop
-	# For now on, $s7 store the frame number
 	GameLoop:
 		
 		# next frame
@@ -421,6 +392,44 @@ main:
 	
 	# exit
 	terminate()
+	
+# initialization {{{
+
+	initialization:
+		fentry($ra)
+
+		# allocate space
+		jal allocMemory
+	
+		# Clean screen on start up
+		li $t0, 0
+		lw $t1, screen_ysize
+		lw $t2, screen_xbits
+		sll $t1, $t1, 2
+		sllv $t1, $t1, $t2
+		clearScreen:
+			sw $zero, 0x10040000($t0)
+			addi $t0, $t0, 4
+			bne $t0, $t1, clearScreen
+	
+		# init Blocks
+		li $s0, 0
+		lw $s1, totBlocks
+		drawBlocksloop:
+			drawBlockR($s0)
+			addi $s0, $s0, 1
+			bne $s0, $s1, drawBlocksloop
+		drawBlocksloopExit:
+	
+		# init system time
+		li $v0, 30			# retrieve system time in ms unit
+		syscall
+		sw $a0, lastms 		# store the lower 32 bit time to lastms
+		
+		fexit($ra)
+		jr $ra
+
+# initialization }}}
 	
 # gameCheck {{{
 
