@@ -278,6 +278,12 @@
     collisionNP: .word 0
     collisionPushByPanel: .word 4
     
+    # wall
+    wallTopObjectId: 	.word 254
+    wallBottomObjectId: .word 253
+    wallLeftObjectId: 	.word 252
+    wallRightObjectId: 	.word 251
+    
     # panel
 	panelX: 	.word 128
 	panelY:		.word 120
@@ -358,6 +364,10 @@
 	
 .text
     
+# 1 TODO: refactor code to the right place
+# 3 TODO: setting a speed upperbound
+# 4 TODO: Comment up stuff   
+   
 # -------------------------------------------
 # -  main: the main entry of breakout game  -
 # -------------------------------------------
@@ -368,16 +378,13 @@ main:
 	# Game loop
 	GameLoop:
 		
-		# next frame
-		jal waitNextClock		
-						
 		# Handle user key event 
 		jal handleInput
 		
 		# Let the ball move 
 		jal movingEvent
 		
-		# handle collision
+		# Handle collision
 		jal collisionHandler
 		
 		# Test if game finished
@@ -386,7 +393,10 @@ main:
 		# Drawing shit on the screen
 		jal render
 		
-		# loop
+		# Next frame
+		jal waitNextFrame		
+		
+		# Loop
 		lw $t7, gaming
 		bnez $t7, GameLoop
 	
@@ -484,12 +494,12 @@ main:
 
 # }}}
 
-# waitNextClock {{{
+# waitNextFrame {{{
 
-# -------------------------------------------------------------------------
-# -  waitNextClock: Wait for a frame time, it should be greater than 1ms  -
-# -------------------------------------------------------------------------
-	waitNextClock:
+# ------------------------------------------------------
+# -  waitNextFrame: Wait for a frame time, about 20ms  -
+# ------------------------------------------------------
+	waitNextFrame:
 		fentry($a0,$a1,$ra)
 		
 		keepWaiting:
@@ -501,9 +511,9 @@ main:
 		bnez $t0, keepWaiting   # keep waiting until at least 1ms passed
 		
 		sw $v0, passedms		# store the millisecond been passed since last waiting.
-		sltiu $t0, $v0, 30		# if the fps is lower than 10, show a warning.
+		sltiu $t0, $v0, 50		# if the fps is lower than 50, show a warning.
 		bnez $t0, nothing_ok
-			slowHint($v0)
+			slowHint($v0)		# display the low FPS hint on RUN I/O
 		nothing_ok:
 		sw $a0, lastms
 		
@@ -795,29 +805,34 @@ main:
 			
 			lw $t1, screen_ysize
 			sgt $t0, $s3, $t1
-			bnez $t0, on_bottomWallCollision
+			bnez $t0, on_bottomWallCollision	# test if ball collide with bottom wall
 			
 			# Nothing happened
 			j on_handleCollisionWithWall_End
 			
 			on_leftWallCollision:
+				lw $a0, wallLeftObjectId
+				jal collision_event
+				j afterCollisionWall
+				
 			on_rightWallCollision:
-				jal ballReverseXSpeed
-				j afterCollision
-
+				lw $a0, wallRightObjectId
+				jal collision_event
+				j afterCollisionWall
 
 			on_bottomWallCollision:	
-				li $t0, 1
-				sw $t0, ballTouchBottomWall
-			on_topWallCollision:
-				jal ballReverseYSpeed
-				j afterCollision
+				lw $a0, wallBottomObjectId
+				jal collision_event
+				j afterCollisionWall
 				
-			afterCollision:
-				sw $zero, ballXMovement		# remove movement
-				sw $zero, ballYMovement
+			on_topWallCollision:
+				lw $a0, wallTopObjectId
+				jal collision_event
+				j afterCollisionWall
+				
+			afterCollisionWall:
 			
-			on_handleCollisionWithWall_End:
+		on_handleCollisionWithWall_End:
 
             # Test if any color code intersection. if so, read the color payload 
             # trigger different operation up on color code
@@ -909,7 +924,41 @@ main:
 		fentry($ra,$s0,$s1,$s2)
 		fentry($s3)
 		
-		# Test the collision direction, there is three possible value, LF(Left-Right), TB(Top-Bottom), CR(Corner)
+		collision_event_wall:
+			# Testing if this is a wall Collision
+			lw $t0, wallTopObjectId
+			lw $t1, wallBottomObjectId
+			lw $t2, wallLeftObjectId
+			lw $t3, wallRightObjectId
+		
+			beq $a0, $t0, c_wallTop
+			beq $a0, $t1, c_wallBottom
+			beq $a0, $t2, c_wallLeft
+			beq $a0, $t3, c_wallRight
+			j collision_event_wall_end			# apparently not a wall collision
+			
+			c_wallBottom:
+				jal ballReverseYSpeed
+				li $t0, 1
+				sw $t0, ballTouchBottomWall
+				j collision_event_end
+			
+			c_wallTop:
+				jal ballReverseYSpeed
+				j collision_event_end
+			
+			c_wallLeft:
+				jal ballReverseXSpeed
+				j collision_event_end
+			
+			c_wallRight:
+				jal ballReverseXSpeed
+				j collision_event_end
+		
+		collision_event_wall_end:
+		
+		collision_event_panel_and_blocks:
+			# Test the collision direction, there is three possible value, LF(Left-Right), TB(Top-Bottom), CR(Corner)
 			jal getObjectLR
 			addi $t0, $v0, 0		# $t0 = object left
 			addi $t1, $v1, 0		# $t1 = object right
@@ -1075,6 +1124,8 @@ main:
 			jal collision_change_ball_movement
 			
 		next_collision_2:
+		
+		collision_event_end:
 		
 		fexit($s3)
 		fexit($ra,$s0,$s1,$s2)
